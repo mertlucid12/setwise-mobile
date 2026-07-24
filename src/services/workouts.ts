@@ -19,11 +19,18 @@ function rowToSetEntry(row: SetRow): SetEntry {
   };
 }
 
-/** Reads sets since `sinceMs`, joined through workout_exercises for the exerciseId. RLS scopes this to the signed-in user. */
+/**
+ * Reads completed sets since `sinceMs`, joined through workout_exercises for
+ * the exerciseId. RLS scopes this to the signed-in user. Excludes
+ * `completed: false` rows (e.g. a planned-but-not-yet-done set) so volume
+ * totals and progressive-overload suggestions only count weight actually
+ * lifted.
+ */
 export async function fetchRecentSets(sinceMs: number): Promise<SetEntry[]> {
   const { data, error } = await supabase
     .from('sets')
     .select('id, weight, reps, created_at, workout_exercises(exercise_id)')
+    .eq('completed', true)
     .gte('created_at', new Date(sinceMs).toISOString())
     .order('created_at', { ascending: false });
 
