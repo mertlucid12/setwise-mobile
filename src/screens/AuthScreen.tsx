@@ -16,7 +16,8 @@ import {
 } from '@gluestack-ui/themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
-import { colors } from '@/theme';
+import AnimatedBackground from '@/components/AnimatedBackground';
+import { colors, cardShadow } from '@/theme';
 
 export default function AuthScreen() {
   const { signIn, signUp, signInWithGoogle } = useAuth();
@@ -50,6 +51,7 @@ export default function AuthScreen() {
 
   return (
     <Box flex={1} bg="$backgroundDark950">
+      <AnimatedBackground />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <VStack flex={1} justifyContent="center" px="$6" space="xl">
           <VStack alignItems="center" space="sm">
@@ -79,6 +81,7 @@ export default function AuthScreen() {
             borderWidth={1}
             borderColor="$borderDark800"
             p="$5"
+            {...cardShadow}
           >
             <VStack space="md">
               <Input variant="outline" size="lg" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">

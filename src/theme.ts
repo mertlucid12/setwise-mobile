@@ -7,6 +7,15 @@ import { config as defaultConfig } from '@gluestack-ui/config';
  * Progress) picks up the brand color automatically. Everything else
  * (backgroundDark*, borderDark*, textDark*) keeps gluestack's default dark
  * palette, which is already a polished neutral scale.
+ *
+ * Font pairing matches the web dashboard (LiftLog's app/layout.tsx) so the
+ * brand looks like one product across platforms: Barlow Condensed (bold
+ * condensed, athletic/scoreboard face) carries every Heading; Barlow is the
+ * body face. Geist Mono is reserved for numeric readouts (weight, reps,
+ * RPE, rest timer) - applied per-instance via fontFamily="$mono" rather
+ * than as a global default. Weights loaded in App.tsx must match these
+ * names exactly (gluestack's font resolver appends "_{weight}{WeightName}"
+ * to match @expo-google-fonts export names).
  */
 export const gluestackConfig = createConfig({
   ...defaultConfig,
@@ -27,8 +36,23 @@ export const gluestackConfig = createConfig({
       primary900: '#0D1B11',
       primary950: '#070F09',
     },
+    fonts: {
+      ...defaultConfig.tokens.fonts,
+      heading: 'Barlow Condensed',
+      body: 'Barlow',
+      mono: 'Geist Mono',
+    },
   },
 });
+
+/** Subtle elevation for primary card surfaces - spread onto a Box's props. */
+export const cardShadow = {
+  shadowColor: '#000000',
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.3,
+  shadowRadius: 8,
+  elevation: 4,
+} as const;
 
 // Standalone tokens for places that can't consume gluestack's style props
 // directly (LinearGradient colors, React Navigation's tabBar theme, RN

@@ -5,8 +5,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import WorkoutLogScreen from '@/screens/WorkoutLogScreen';
+import CalendarScreen from '@/screens/CalendarScreen';
+import RoutinesScreen from '@/screens/RoutinesScreen';
 import VolumeDashboardScreen from '@/screens/VolumeDashboardScreen';
 import AICoachScreen from '@/screens/AICoachScreen';
+import ProfileScreen from '@/screens/ProfileScreen';
 import AuthScreen from '@/screens/AuthScreen';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/theme';
@@ -21,8 +24,11 @@ const setwiseTheme = {
 
 const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   Antrenman: 'barbell',
+  Takvim: 'calendar',
+  Rutinler: 'list',
   Hacim: 'stats-chart',
   'AI Koç': 'sparkles',
+  Profil: 'person-circle',
 };
 
 function MainTabs() {
@@ -46,8 +52,11 @@ function MainTabs() {
       })}
     >
       <Tab.Screen name="Antrenman" component={WorkoutLogScreen} />
+      <Tab.Screen name="Takvim" component={CalendarScreen} />
+      <Tab.Screen name="Rutinler" component={RoutinesScreen} />
       <Tab.Screen name="Hacim" component={VolumeDashboardScreen} />
       <Tab.Screen name="AI Koç" component={AICoachScreen} />
+      <Tab.Screen name="Profil" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }

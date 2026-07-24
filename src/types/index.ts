@@ -17,12 +17,16 @@ export interface Exercise {
   secondaryMuscles?: MuscleGroup[];
 }
 
+export type SetType = 'normal' | 'warmup' | 'dropset' | 'failure';
+
 export interface SetEntry {
   id: string;
   exerciseId: string;
   weightKg: number;
   reps: number;
   timestamp: number;
+  setType: SetType;
+  rpe?: number;
 }
 
 export interface WorkoutSession {
@@ -60,4 +64,43 @@ export interface AICoachMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+}
+
+export interface Profile {
+  displayName: string | null;
+  weightKg: number | null;
+  heightCm: number | null;
+}
+
+export interface RoutineExercise {
+  id: string;
+  exerciseId: string;
+  name: string;
+  targetSets: number;
+  targetReps: number;
+  position: number;
+}
+
+export interface Routine {
+  id: string;
+  title: string;
+  exercises: RoutineExercise[];
+}
+
+export interface WorkoutDay {
+  workoutId: string;
+  dateKey: string; // 'YYYY-MM-DD', local calendar date
+  notes: string | null;
+}
+
+export interface BodyMeasurement {
+  id: string;
+  recordedAt: number;
+  weightKg: number | null;
+  waistCm: number | null;
+  chestCm: number | null;
+  armCm: number | null;
+  thighCm: number | null;
+  hipCm: number | null;
+  calfCm: number | null;
 }

@@ -16,7 +16,8 @@ import { computeWeeklyMuscleVolume } from '@/services/volume';
 import { useExercises } from '@/hooks/useExercises';
 import { useWorkoutSets } from '@/hooks/useWorkoutSets';
 import { MuscleVolumeSummary } from '@/types';
-import { colors } from '@/theme';
+import AnimatedBackground from '@/components/AnimatedBackground';
+import { colors, cardShadow } from '@/theme';
 
 const MUSCLE_LABELS: Record<string, string> = {
   chest: 'Göğüs', back: 'Sırt', shoulders: 'Omuz', biceps: 'Biceps',
@@ -61,6 +62,7 @@ export default function VolumeDashboardScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <Box flex={1} bg="$backgroundDark950" px="$4" pt="$4">
+        <AnimatedBackground />
         <Text color={colors.accent} fontSize={12} fontWeight="$bold" letterSpacing={1.2} textTransform="uppercase">
           Bu hafta
         </Text>
@@ -83,6 +85,7 @@ export default function VolumeDashboardScreen() {
               borderRadius="$xl"
               p="$3"
               mb="$2"
+              {...cardShadow}
             >
               <HStack justifyContent="space-between" alignItems="center" mb="$2">
                 <Text color="$textDark0" fontWeight="$bold" size="md">
@@ -98,7 +101,7 @@ export default function VolumeDashboardScreen() {
               <Progress value={Math.min(100, (item.setsThisWeek / item.target.max) * 100)} size="sm" bg="$backgroundDark800" borderRadius="$full">
                 <ProgressFilledTrack bg={STATUS_COLOR[item.status]} borderRadius="$full" />
               </Progress>
-              <Text color="$textDark500" size="xs" mt="$2">
+              <Text color="$textDark500" size="xs" mt="$2" fontFamily="$mono">
                 {item.setsThisWeek} set — hedef {item.target.min}-{item.target.max} set/hafta
               </Text>
             </Box>

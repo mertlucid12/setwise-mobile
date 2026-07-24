@@ -9,7 +9,8 @@ const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
  */
 export function computeWeeklyMuscleVolume(sets: SetEntry[], exercises: Exercise[]): MuscleVolumeSummary[] {
   const cutoff = Date.now() - ONE_WEEK_MS;
-  const recentSets = sets.filter((s) => s.timestamp >= cutoff);
+  // Warm-up sets are deliberately sub-maximal and don't count as working volume.
+  const recentSets = sets.filter((s) => s.timestamp >= cutoff && s.setType !== 'warmup');
   const exerciseById = new Map(exercises.map((e) => [e.id, e]));
 
   const totals: Record<MuscleGroup, number> = {

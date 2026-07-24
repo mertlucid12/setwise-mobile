@@ -6,6 +6,7 @@ import { AICoachMessage } from '@/types';
 import { askCoach } from '@/services/aiCoach';
 import { useWorkoutSets } from '@/hooks/useWorkoutSets';
 import { useExercises } from '@/hooks/useExercises';
+import AnimatedBackground from '@/components/AnimatedBackground';
 import { colors } from '@/theme';
 
 export default function AICoachScreen() {
@@ -58,6 +59,7 @@ export default function AICoachScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <Box flex={1} bg="$backgroundDark950" px="$4" pt="$4">
+        <AnimatedBackground />
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <HStack alignItems="center" space="sm" mb="$3">
             <Box w={34} h={34} borderRadius="$full" bg="$primary900" alignItems="center" justifyContent="center">

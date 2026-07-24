@@ -29,8 +29,32 @@ iskeleti. Expo/React Native + TypeScript ile kuruldu, 3 ana ekranı ve çekirdek
 - `src/screens/` — Antrenman kaydı, Hacim dashboard'u, AI Koç sohbet (hepsi artık Supabase'ten
   gelen gerçek veriyle çalışıyor)
 - `src/navigation/AppNavigator.tsx` — oturum yoksa AuthScreen, varsa alt sekme navigasyonu
+  (Antrenman, Takvim, Rutinler, Hacim, AI Koç, Profil)
 - `src/theme.ts` + `gluestack-ui` (`@gluestack-ui/themed`) — tüm ekranlar bu component
-  kütüphanesiyle yeniden tasarlandı, marka rengi (yeşil/altın) `primary` skalasına özelleştirildi
+  kütüphanesiyle yeniden tasarlandı, marka rengi (yeşil/altın) `primary` skalasına özelleştirildi.
+  Font çifti web dashboard'la (LiftLog `app/layout.tsx`) birebir aynı: Barlow Condensed
+  (başlıklar), Barlow (gövde metni), Geist Mono (ağırlık/tekrar/RPE gibi rakamsal veriler)
+- `src/components/AnimatedBackground.tsx` — tüm ana ekranlarda yavaşça sürüklenen yeşil/altın
+  glow (RN'in kendi `Animated` API'si + `react-native-svg`, yeni native modül eklemeden;
+  cihazın "hareket azalt" ayarına saygı duyuyor)
+- `src/screens/CalendarScreen.tsx` — aylık takvim, antrenman yapılan günleri noktayla
+  işaretler; bir güne dokununca o günün setlerini ve serbest metin notunu (`workouts.notes`,
+  ör. "böyle beslendim işe yaradı") gösterip düzenlemeye izin verir
+- `src/screens/ProfileScreen.tsx` — hesap bilgisi, kilo/boy, vücut ölçümleri geçmişi
+  (kilo grafiği + bel/göğüs/kol check-in), çıkış yap
+- `src/screens/RoutinesScreen.tsx` — rutin (workout template) oluşturma/düzenleme,
+  `routines`/`routine_exercises` tablolarını okur-yazar (web ile paylaşılan şema);
+  "Başlat" `ActiveRoutineContext` üzerinden Antrenman ekranına o rutinin egzersiz
+  listesini ve hedef set/tekrar sayılarını aktarır
+- `src/services/personalRecords.ts` — bir set kaydedilince ağırlık/hacim rekoru kırıldıysa
+  tespit eder (ısınma setleri hariç), WorkoutLogScreen'de banner olarak gösterilir
+- `src/components/LineChart.tsx` — `react-native-svg` üzerine yazılmış minimal çizgi grafik
+  (yeni bir chart kütüphanesi eklemeden); kilo geçmişi ve egzersiz bazlı tahmini 1RM için kullanılıyor
+- `src/components/ExerciseHistoryModal.tsx` — WorkoutLogScreen'de bir egzersizin geçmişini
+  ve Epley formülüyle tahmini 1RM eğrisini gösterir
+- Set tipi etiketleme (Normal/Isınma/Drop Set/Başarısızlık) + RPE girişi — `sets` tablosunda
+  `set_type`/`rpe` kolonları; `computeWeeklyMuscleVolume` artık ısınma setlerini hacme saymıyor
+- Dinlenme sayacı — her set kaydından sonra WorkoutLogScreen'de otomatik başlıyor (+15sn/atla)
 
 ## Neler EKSİK (Claude Code'da devam edilecek)
 1. ~~Firestore/Supabase bağlantısı~~ — **tamamlandı.** WorkoutLogScreen artık Supabase'e
@@ -50,12 +74,16 @@ iskeleti. Expo/React Native + TypeScript ile kuruldu, 3 ana ekranı ve çekirdek
    `WorkoutLogScreen`'de "+ Egzersiz ekle" butonu → `AddExerciseModal` üzerinden
    `is_custom: true, owner_id` ile `exercises` tablosuna yazıyor (RLS zaten buna izin
    veriyordu).
-5. **Apple Watch desteği** — MVP'de stretch goal, bu iskelette yok.
-6. **HealthKit entegrasyonu** — v1.5 için, bu iskelette yok.
-7. **RPE/ağrı bazlı öneri** — `SetEntry`'de bu alanlar hiç var olmadı (ne DB kolonu ne
-   UI); `suggestNextLoad` şu an yalnızca tekrar sayısına bakıyor. RPE'yi gerçekten
-   eklemek `sets` tablosuna yeni bir kolon + WorkoutLogScreen'de giriş UI'sı gerektirir,
-   ayrı bir iş olarak ele alınmalı.
+5. ~~Rutinler (routines) UI~~ — **tamamlandı.** Bkz. `RoutinesScreen.tsx` yukarıda.
+6. ~~RPE + set tipi + rekor tespiti + dinlenme sayacı~~ — **tamamlandı.** Bkz. yukarıdaki
+   madde. AI koça RPE verisi henüz beslenmiyor — `askCoach` hâlâ sadece ağırlık/tekrar
+   görüyor, ileride RPE'yi de context'e eklemek öneri kalitesini artırır.
+7. ~~Vücut ölçümleri + egzersiz bazlı 1RM grafiği~~ — **tamamlandı.** `body_measurements`
+   tablosu şu an sadece kilo/bel/göğüs/kol topluyor (UI'da); şema thigh/hip/calf
+   kolonlarını da içeriyor, istenirse ProfileScreen'e eklenmesi kolay.
+8. **Apple Watch desteği** — MVP'de stretch goal, bu iskelette yok.
+9. **HealthKit entegrasyonu** — v1.5 için, bu iskelette yok.
+10. **Plaka hesaplayıcı** — rakip uygulamalarda standart, düşük efor/yüksek cila; henüz yok.
 
 ## Kurulum
 ```bash

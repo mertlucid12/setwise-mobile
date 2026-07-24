@@ -1,11 +1,13 @@
 import { supabase } from './supabase';
-import { SetEntry } from '@/types';
+import { SetEntry, SetType } from '@/types';
 
 interface SetRow {
   id: string;
   weight: number;
   reps: number;
   created_at: string;
+  set_type: SetType;
+  rpe: number | null;
   workout_exercises: { exercise_id: string } | null;
 }
 
@@ -16,6 +18,8 @@ function rowToSetEntry(row: SetRow): SetEntry {
     weightKg: Number(row.weight),
     reps: row.reps,
     timestamp: new Date(row.created_at).getTime(),
+    setType: row.set_type,
+    rpe: row.rpe ?? undefined,
   };
 }
 
@@ -29,10 +33,27 @@ function rowToSetEntry(row: SetRow): SetEntry {
 export async function fetchRecentSets(sinceMs: number): Promise<SetEntry[]> {
   const { data, error } = await supabase
     .from('sets')
-    .select('id, weight, reps, created_at, workout_exercises(exercise_id)')
+    .select('id, weight, reps, created_at, set_type, rpe, workout_exercises(exercise_id)')
     .eq('completed', true)
     .gte('created_at', new Date(sinceMs).toISOString())
     .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return ((data ?? []) as unknown as SetRow[]).map(rowToSetEntry);
+}
+
+/**
+ * Sets for one specific workout (a single calendar day), for the calendar
+ * screen's day-detail view. Uses `!inner` so the `workout_id` filter on the
+ * embedded workout_exercises resource actually restricts the join.
+ */
+export async function fetchSetsForWorkout(workoutId: string): Promise<SetEntry[]> {
+  const { data, error } = await supabase
+    .from('sets')
+    .select('id, weight, reps, created_at, set_type, rpe, workout_exercises!inner(exercise_id, workout_id)')
+    .eq('workout_exercises.workout_id', workoutId)
+    .eq('completed', true)
+    .order('created_at');
 
   if (error) throw error;
   return ((data ?? []) as unknown as SetRow[]).map(rowToSetEntry);
@@ -116,8 +137,10 @@ export async function logSet(params: {
   exerciseName: string;
   weightKg: number;
   reps: number;
+  setType?: SetType;
+  rpe?: number;
 }): Promise<SetEntry> {
-  const { userId, exerciseId, exerciseName, weightKg, reps } = params;
+  const { userId, exerciseId, exerciseName, weightKg, reps, setType = 'normal', rpe } = params;
 
   const workoutId = await getOrCreateTodayWorkout(userId);
   const workoutExerciseId = await getOrCreateWorkoutExercise(userId, workoutId, exerciseId, exerciseName);
@@ -136,6 +159,8 @@ export async function logSet(params: {
       reps,
       completed: true,
       position: count ?? 0,
+      set_type: setType,
+      rpe: rpe ?? null,
     })
     .select('id, created_at')
     .single();
@@ -148,5 +173,7 @@ export async function logSet(params: {
     weightKg,
     reps,
     timestamp: new Date(data.created_at).getTime(),
+    setType,
+    rpe,
   };
 }
