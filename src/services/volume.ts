@@ -38,10 +38,14 @@ export function computeWeeklyMuscleVolume(sets: SetEntry[], exercises: Exercise[
 
 /**
  * Very simple explainable progressive-overload suggestion: if the last two
- * sessions for an exercise hit the top of the rep range at a given RPE,
- * suggest a small weight increase and say why. This is intentionally
- * transparent (not a black box) - the "why" is the whole point per the
- * research: Hevy's AI is algorithmic but not explainable to the user.
+ * sessions for an exercise hit the top of the rep range, suggest a small
+ * weight increase and say why. This is intentionally transparent (not a
+ * black box) - the "why" is the whole point per the research: Hevy's AI is
+ * algorithmic but not explainable to the user.
+ *
+ * Rep count is the only signal available — there's no RPE/effort input
+ * anywhere in the app (no UI, no `sets` column for it), so this can't yet
+ * hold back a suggestion just because an exercise felt hard.
  */
 export function suggestNextLoad(
   exerciseId: string,
@@ -58,13 +62,12 @@ export function suggestNextLoad(
 
   const lastWeight = relevant[0].weightKg;
   const avgReps = relevant.reduce((sum, s) => sum + s.reps, 0) / relevant.length;
-  const avgRpe = relevant.filter((s) => s.rpe != null).reduce((sum, s, _, arr) => sum + (s.rpe ?? 0) / arr.length, 0);
 
-  if (avgReps >= 10 && (avgRpe === 0 || avgRpe <= 7.5)) {
+  if (avgReps >= 10) {
     const bump = lastWeight >= 40 ? 2.5 : 1.25;
     return {
       suggestedWeightKg: lastWeight + bump,
-      reason: `Son seansta ortalama ${avgReps.toFixed(1)} tekrar yaptın ve zorluk düşük görünüyordu (RPE ${avgRpe || 'girilmedi'}). Ağırlığı ${bump}kg artırmayı dene.`,
+      reason: `Son seansta ortalama ${avgReps.toFixed(1)} tekrar yaptın, hedef aralığın üstündesin. Ağırlığı ${bump}kg artırmayı dene.`,
     };
   }
 

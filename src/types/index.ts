@@ -22,8 +22,6 @@ export interface SetEntry {
   exerciseId: string;
   weightKg: number;
   reps: number;
-  rpe?: number; // 1-10, optional perceived effort
-  soreness?: number; // 1-5, optional self-reported soreness for that muscle pre-session
   timestamp: number;
 }
 
