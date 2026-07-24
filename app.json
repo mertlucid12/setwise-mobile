@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Setwise",
+    "slug": "setwise-mobile",
+    "scheme": "setwise",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#0E0E0E"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.setwise.mobile"
+    },
+    "android": {
+      "package": "com.setwise.mobile"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
