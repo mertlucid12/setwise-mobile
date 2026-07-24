@@ -35,19 +35,27 @@ iskeleti. Expo/React Native + TypeScript ile kuruldu, 3 ana ekranı ve çekirdek
 ## Neler EKSİK (Claude Code'da devam edilecek)
 1. ~~Firestore/Supabase bağlantısı~~ — **tamamlandı.** WorkoutLogScreen artık Supabase'e
    yazıyor, açılışta son 4 haftalık geçmiş çekiliyor.
-2. ~~Kimlik doğrulama~~ — **tamamlandı** (e-posta/şifre). Google OAuth (web'de zaten
-   aktif) mobilde henüz yok — `expo-auth-session` ile deep-link redirect akışı gerekir.
+2. ~~Kimlik doğrulama~~ — **tamamlandı**, Google OAuth dahil. `AuthContext.signInWithGoogle`
+   PKCE tabanlı `expo-auth-session` + deep-link redirect (`app.json`'daki `setwise://`
+   şeması) ile tam çalışıyor. **Doğrulanmadı:** Supabase Dashboard → Authentication →
+   URL Configuration → Redirect URLs listesinde `setwise://auth-callback`'in kayıtlı
+   olduğu kontrol edilmeli — kayıtlı değilse OAuth akışı Google'dan dönüşte hata verir.
 3. ~~AI koç backend'i~~ — **tamamlandı.** `aiCoach` Supabase Edge Function'ı deploy edildi
-   (Anthropic Claude Sonnet 5 çağırıyor), `src/services/aiCoach.ts` artık
+   (Claude Sonnet 5 çağırıyor), `src/services/aiCoach.ts` artık
    `supabase.functions.invoke` kullanıyor. Çalışması için Supabase projesine
    `ANTHROPIC_API_KEY` secret'ının eklenmesi gerekiyor (henüz eklenmedi — para
-   gerektirdiği için şimdilik ertelendi).
+   gerektirdiği ve gerçek bir API anahtarı olduğu için bu bilerek bir agent
+   session'ından geçirilmiyor; Dashboard → Edge Functions → Secrets'tan elle eklenmeli).
 4. ~~Egzersiz kütüphanesi genişletme + özel egzersiz ekleme~~ — **tamamlandı.**
    `WorkoutLogScreen`'de "+ Egzersiz ekle" butonu → `AddExerciseModal` üzerinden
    `is_custom: true, owner_id` ile `exercises` tablosuna yazıyor (RLS zaten buna izin
    veriyordu).
 5. **Apple Watch desteği** — MVP'de stretch goal, bu iskelette yok.
 6. **HealthKit entegrasyonu** — v1.5 için, bu iskelette yok.
+7. **RPE/ağrı bazlı öneri** — `SetEntry`'de bu alanlar hiç var olmadı (ne DB kolonu ne
+   UI); `suggestNextLoad` şu an yalnızca tekrar sayısına bakıyor. RPE'yi gerçekten
+   eklemek `sets` tablosuna yeni bir kolon + WorkoutLogScreen'de giriş UI'sı gerektirir,
+   ayrı bir iş olarak ele alınmalı.
 
 ## Kurulum
 ```bash
