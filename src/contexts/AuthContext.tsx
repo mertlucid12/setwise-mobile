@@ -3,6 +3,7 @@ import { Session } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { supabase } from '@/services/supabase';
+import { clearExercisesCache } from '@/hooks/useExercises';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -67,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     signOut: async () => {
       await supabase.auth.signOut();
+      clearExercisesCache();
     },
   };
 
