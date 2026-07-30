@@ -37,6 +37,57 @@ export function computeWeeklyMuscleVolume(sets: SetEntry[], exercises: Exercise[
   });
 }
 
+export type RecoveryStatus = 'untrained' | 'fatigued' | 'recovering' | 'fresh';
+
+export interface MuscleRecovery {
+  muscle: MuscleGroup;
+  daysSinceTrained: number | null; // null = never logged
+  status: RecoveryStatus;
+}
+
+const FATIGUED_MS = 24 * 60 * 60 * 1000;
+const RECOVERING_MS = 3 * 24 * 60 * 60 * 1000;
+
+/**
+ * Per-muscle-group recovery estimate based on time since it was last a
+ * primary muscle in a logged (non-warm-up) set. Thresholds follow the
+ * common ~48-72h hypertrophy recovery window: <24h still fatigued, <3 days
+ * recovering, 3+ days fresh. This is a simple heuristic, not a physiological
+ * model - there's no sleep/soreness/RPE input to refine it further yet.
+ */
+export function computeMuscleRecovery(sets: SetEntry[], exercises: Exercise[]): MuscleRecovery[] {
+  const exerciseById = new Map(exercises.map((e) => [e.id, e]));
+  const lastTrainedAt: Partial<Record<MuscleGroup, number>> = {};
+
+  for (const set of sets) {
+    if (set.setType === 'warmup') continue;
+    const exercise = exerciseById.get(set.exerciseId);
+    if (!exercise) continue;
+    const muscle = exercise.primaryMuscle;
+    if (lastTrainedAt[muscle] == null || set.timestamp > lastTrainedAt[muscle]!) {
+      lastTrainedAt[muscle] = set.timestamp;
+    }
+  }
+
+  const now = Date.now();
+  const muscles: MuscleGroup[] = [
+    'chest', 'back', 'shoulders', 'biceps', 'triceps',
+    'quads', 'hamstrings', 'glutes', 'calves', 'abs',
+  ];
+
+  return muscles.map((muscle) => {
+    const trainedAt = lastTrainedAt[muscle];
+    if (trainedAt == null) return { muscle, daysSinceTrained: null, status: 'untrained' as const };
+
+    const elapsed = now - trainedAt;
+    const daysSinceTrained = Math.floor(elapsed / (24 * 60 * 60 * 1000));
+    let status: RecoveryStatus = 'fresh';
+    if (elapsed < FATIGUED_MS) status = 'fatigued';
+    else if (elapsed < RECOVERING_MS) status = 'recovering';
+    return { muscle, daysSinceTrained, status };
+  });
+}
+
 /**
  * Very simple explainable progressive-overload suggestion: if the last two
  * sessions for an exercise hit the top of the rep range, suggest a small
@@ -48,17 +99,20 @@ export function computeWeeklyMuscleVolume(sets: SetEntry[], exercises: Exercise[
  * anywhere in the app (no UI, no `sets` column for it), so this can't yet
  * hold back a suggestion just because an exercise felt hard.
  */
-export function suggestNextLoad(
-  exerciseId: string,
-  history: SetEntry[]
-): { suggestedWeightKg: number | null; reason: string } {
+export interface LoadSuggestion {
+  suggestedWeightKg: number | null;
+  reasonKey: string;
+  reasonParams?: Record<string, string | number>;
+}
+
+export function suggestNextLoad(exerciseId: string, history: SetEntry[]): LoadSuggestion {
   const relevant = history
     .filter((s) => s.exerciseId === exerciseId)
     .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, 6); // last ~2 sessions assuming ~3 sets each
 
   if (relevant.length === 0) {
-    return { suggestedWeightKg: null, reason: 'Henüz bu egzersiz için geçmiş veri yok.' };
+    return { suggestedWeightKg: null, reasonKey: 'suggest.noHistory' };
   }
 
   const lastWeight = relevant[0].weightKg;
@@ -68,19 +122,18 @@ export function suggestNextLoad(
     const bump = lastWeight >= 40 ? 2.5 : 1.25;
     return {
       suggestedWeightKg: lastWeight + bump,
-      reason: `Son seansta ortalama ${avgReps.toFixed(1)} tekrar yaptın, hedef aralığın üstündesin. Ağırlığı ${bump}kg artırmayı dene.`,
+      reasonKey: 'suggest.aboveRange',
+      reasonParams: { reps: avgReps.toFixed(1), bump },
     };
   }
 
   if (avgReps < 6) {
     return {
       suggestedWeightKg: lastWeight,
-      reason: `Tekrar sayın hedefin altında (${avgReps.toFixed(1)}). Bu hafta aynı ağırlıkla kal, formu ve dinlenme süresini gözden geçir.`,
+      reasonKey: 'suggest.belowRange',
+      reasonParams: { reps: avgReps.toFixed(1) },
     };
   }
 
-  return {
-    suggestedWeightKg: lastWeight,
-    reason: `İlerleme normal aralıkta. Aynı ağırlıkla devam edip tekrar sayısını artırmayı hedefle.`,
-  };
+  return { suggestedWeightKg: lastWeight, reasonKey: 'suggest.normal' };
 }

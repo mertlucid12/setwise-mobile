@@ -13,9 +13,10 @@ import {
   Text,
   Box,
 } from '@gluestack-ui/themed';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import { SetEntry } from '@/types';
 import { estimateOneRepMax } from '@/services/oneRepMax';
+import { useI18n } from '@/i18n';
 import LineChart from './LineChart';
 import { colors } from '@/theme';
 
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export default function ExerciseHistoryModal({ visible, onClose, exerciseName, sets }: Props) {
+  const { t, dateLocale } = useI18n();
   const workingSets = sets.filter((s) => s.setType !== 'warmup').sort((a, b) => a.timestamp - b.timestamp);
   const chartData = workingSets.map((s) => ({ timestamp: s.timestamp, value: estimateOneRepMax(s.weightKg, s.reps) }));
   const best = chartData.length > 0 ? Math.max(...chartData.map((p) => p.value)) : null;
@@ -40,22 +42,22 @@ export default function ExerciseHistoryModal({ visible, onClose, exerciseName, s
             {exerciseName}
           </Heading>
           <ModalCloseButton>
-            <Ionicons name="close" size={22} color={colors.textMuted} />
+            <Icon name="close" size={22} color={colors.textMuted} />
           </ModalCloseButton>
         </ModalHeader>
 
         <ModalBody>
           {chartData.length === 0 ? (
             <Text color="$textDark400" size="sm">
-              Bu egzersiz için henüz geçmiş yok.
+              {t('history.noHistory')}
             </Text>
           ) : (
             <VStack space="md">
               <VStack space="xs">
                 <HStack alignItems="center" space="xs">
-                  <Ionicons name="trending-up" size={14} color={colors.accent} />
+                  <Icon name="trending-up" size={14} color={colors.accent} />
                   <Text color={colors.accent} fontWeight="$bold" size="sm" fontFamily="$mono">
-                    Tahmini 1RM {best != null ? `· en iyi ${best}kg` : ''}
+                    {t('history.est1rm')} {best != null ? `· ${t('history.best', { weight: best })}` : ''}
                   </Text>
                 </HStack>
                 <Box alignItems="center">
@@ -65,7 +67,7 @@ export default function ExerciseHistoryModal({ visible, onClose, exerciseName, s
 
               <VStack space="xs">
                 <Text color="$textDark400" size="xs" textTransform="uppercase" letterSpacing={1}>
-                  Geçmiş
+                  {t('history.past')}
                 </Text>
                 <FlatList
                   data={[...workingSets].reverse()}
@@ -82,7 +84,7 @@ export default function ExerciseHistoryModal({ visible, onClose, exerciseName, s
                       mb="$2"
                     >
                       <Text color="$textDark500" size="xs" fontFamily="$mono">
-                        {new Date(item.timestamp).toLocaleDateString('tr-TR')}
+                        {new Date(item.timestamp).toLocaleDateString(dateLocale)}
                       </Text>
                       <Text color="$textDark0" size="sm" fontWeight="$semibold" fontFamily="$mono">
                         {item.weightKg}kg × {item.reps}

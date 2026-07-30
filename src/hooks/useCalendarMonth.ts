@@ -3,8 +3,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { WorkoutDay } from '@/types';
 import { fetchWorkoutDays, saveWorkoutNotes as saveWorkoutNotesInSupabase } from '@/services/calendar';
 
-/** `month` is 0-indexed, matching Date.getMonth(). */
-export function useCalendarMonth(year: number, month: number) {
+/**
+ * Loads workout days for an arbitrary range. Range (not month) based because
+ * the calendar's week view can straddle two months - fetching only the anchor
+ * month would drop the workout markers on the spillover days.
+ *
+ * Bounds are passed as timestamps so the effect's dependency list stays
+ * stable across renders (a fresh Date object every render would re-fetch
+ * forever).
+ */
+export function useCalendarRange(startMs: number, endMs: number) {
   const { session } = useAuth();
   const userId = session?.user.id ?? null;
   const [days, setDays] = useState<WorkoutDay[]>([]);
@@ -20,15 +28,13 @@ export function useCalendarMonth(year: number, month: number) {
     setLoading(true);
     setError(null);
     try {
-      const monthStart = new Date(year, month, 1);
-      const monthEnd = new Date(year, month + 1, 1);
-      setDays(await fetchWorkoutDays(userId, monthStart, monthEnd));
+      setDays(await fetchWorkoutDays(userId, new Date(startMs), new Date(endMs)));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Takvim yüklenemedi.');
     } finally {
       setLoading(false);
     }
-  }, [userId, year, month]);
+  }, [userId, startMs, endMs]);
 
   useEffect(() => {
     reload();

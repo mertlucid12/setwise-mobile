@@ -6,40 +6,29 @@ import {
   HStack,
   Heading,
   Text,
-  Input,
-  InputField,
   Button,
   ButtonText,
   Pressable,
   Spinner,
   SafeAreaView,
 } from '@gluestack-ui/themed';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import { useExercises } from '@/hooks/useExercises';
 import { useWorkoutSets } from '@/hooks/useWorkoutSets';
+import { useProfile } from '@/hooks/useProfile';
 import { useActiveRoutine } from '@/contexts/ActiveRoutineContext';
+import { useI18n } from '@/i18n';
 import { suggestNextLoad } from '@/services/volume';
 import { SetType } from '@/types';
 import AddExerciseModal from '@/components/AddExerciseModal';
 import ExerciseHistoryModal from '@/components/ExerciseHistoryModal';
+import ExercisePickerModal from '@/components/ExercisePickerModal';
+import LogSetModal from '@/components/LogSetModal';
 import AnimatedBackground from '@/components/AnimatedBackground';
-import { colors, cardShadow } from '@/theme';
+import { muscleLabelKey, MUSCLE_ICONS } from '@/constants/muscleGroups';
+import { colors } from '@/theme';
 
 const REST_SECONDS_DEFAULT = 90;
-
-const SET_TYPES: { value: SetType; label: string }[] = [
-  { value: 'normal', label: 'Normal' },
-  { value: 'warmup', label: 'Isınma' },
-  { value: 'dropset', label: 'Drop Set' },
-  { value: 'failure', label: 'Başarısızlık' },
-];
-
-const SET_TYPE_LABELS: Record<SetType, string> = {
-  normal: 'Normal',
-  warmup: 'Isınma',
-  dropset: 'Drop Set',
-  failure: 'Başarısızlık',
-};
 
 function formatRestTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -48,8 +37,10 @@ function formatRestTime(seconds: number): string {
 }
 
 export default function WorkoutLogScreen() {
+  const { t } = useI18n();
   const { exercises, loading: exercisesLoading, addExercise } = useExercises();
   const { sets, loading: setsLoading, logSet } = useWorkoutSets();
+  const { profile } = useProfile();
   const { activeRoutine, clearRoutine } = useActiveRoutine();
 
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
@@ -60,9 +51,13 @@ export default function WorkoutLogScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [addExerciseVisible, setAddExerciseVisible] = useState(false);
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [logSetVisible, setLogSetVisible] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [prBanner, setPrBanner] = useState<string | null>(null);
   const [restSeconds, setRestSeconds] = useState<number | null>(null);
+
+  const firstName = profile.displayName?.trim().split(/\s+/)[0] ?? null;
 
   const routineExerciseIds = new Set(activeRoutine?.exercises.map((re) => re.exerciseId) ?? []);
   const visibleExercises = activeRoutine ? exercises.filter((e) => routineExerciseIds.has(e.id)) : exercises;
@@ -99,13 +94,14 @@ export default function WorkoutLogScreen() {
       setWeight('');
       setReps('');
       setRpe('');
+      setLogSetVisible(false);
       setRestSeconds(REST_SECONDS_DEFAULT);
       if (pr) {
-        setPrBanner(pr.message);
+        setPrBanner(t(pr.messageKey, pr.messageParams));
         setTimeout(() => setPrBanner(null), 4000);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Set kaydedilemedi.');
+      setError(err instanceof Error ? err.message : t('workout.errSaveSet'));
     } finally {
       setSaving(false);
     }
@@ -139,10 +135,10 @@ export default function WorkoutLogScreen() {
       <HStack justifyContent="space-between" alignItems="flex-start" mb="$3">
         <VStack>
           <Text color={colors.accent} fontSize={12} fontWeight="$bold" letterSpacing={1.2} textTransform="uppercase">
-            Bugün
+            {firstName ? t('workout.welcome', { name: firstName }) : t('workout.today')}
           </Text>
           <Heading color="$textDark0" size="xl">
-            Antrenman kaydı
+            {t('workout.title')}
           </Heading>
         </VStack>
         {activeExercise && (
@@ -157,7 +153,7 @@ export default function WorkoutLogScreen() {
             alignItems="center"
             justifyContent="center"
           >
-            <Ionicons name="stats-chart" size={16} color={colors.textMuted} />
+            <Icon name="stats-chart" size={16} color={colors.textMuted} />
           </Pressable>
         )}
       </HStack>
@@ -176,7 +172,7 @@ export default function WorkoutLogScreen() {
         >
           {status === 'pr' && (
             <HStack alignItems="center" space="xs" flex={1}>
-              <Ionicons name="trophy" size={15} color={colors.accent} />
+              <Icon name="trophy" size={15} color={colors.accent} />
               <Text color={colors.accent} fontWeight="$bold" size="sm" flex={1} numberOfLines={1}>
                 {prBanner}
               </Text>
@@ -185,20 +181,20 @@ export default function WorkoutLogScreen() {
           {status === 'rest' && (
             <>
               <HStack alignItems="center" space="xs">
-                <Ionicons name="time-outline" size={15} color={colors.primaryLight} />
+                <Icon name="time-outline" size={15} color={colors.primaryLight} />
                 <Text color="$textDark0" fontWeight="$bold" size="sm" fontFamily="$mono">
-                  Dinlenme {formatRestTime(restSeconds as number)}
+                  {t('workout.rest', { time: formatRestTime(restSeconds as number) })}
                 </Text>
               </HStack>
               <HStack space="md">
                 <Pressable onPress={() => setRestSeconds((s) => (s ?? 0) + 15)}>
                   <Text color={colors.primaryLight} size="xs" fontWeight="$semibold">
-                    +15sn
+                    {t('workout.plus15')}
                   </Text>
                 </Pressable>
                 <Pressable onPress={() => setRestSeconds(null)}>
                   <Text color={colors.textMuted} size="xs" fontWeight="$semibold">
-                    Atla
+                    {t('workout.skip')}
                   </Text>
                 </Pressable>
               </HStack>
@@ -207,14 +203,14 @@ export default function WorkoutLogScreen() {
           {status === 'routine' && (
             <>
               <HStack alignItems="center" space="xs">
-                <Ionicons name="list" size={14} color={colors.primaryLight} />
+                <Icon name="list" size={14} color={colors.primaryLight} />
                 <Text color="$textDark0" size="sm" fontWeight="$semibold">
-                  Rutin: {activeRoutine?.title}
+                  {t('workout.routine', { title: activeRoutine?.title ?? '' })}
                 </Text>
               </HStack>
               <Pressable onPress={clearRoutine} hitSlop={8}>
                 <Text color={colors.textMuted} size="xs">
-                  Bitir
+                  {t('workout.finish')}
                 </Text>
               </Pressable>
             </>
@@ -222,47 +218,58 @@ export default function WorkoutLogScreen() {
         </HStack>
       )}
 
-      <HStack alignItems="center" space="sm" mb="$3">
-        <FlatList
-          horizontal
-          data={visibleExercises}
-          keyExtractor={(item) => item.id}
-          showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0, flexShrink: 1 }}
-          renderItem={({ item }) => {
-            const active = item.id === activeExerciseId;
-            return (
-              <Pressable
-                onPress={() => setSelectedExerciseId(item.id)}
-                bg={active ? '$primary500' : '$backgroundDark900'}
-                borderColor={active ? '$primary500' : '$borderDark800'}
-                borderWidth={1}
-                borderRadius="$full"
-                px="$4"
-                py="$2"
-                mr="$2"
-              >
-                <Text color={active ? '$textDark0' : '$textDark400'} fontWeight={active ? '$bold' : '$medium'} size="sm">
-                  {item.name}
-                </Text>
-              </Pressable>
-            );
-          }}
-        />
-        <Pressable
-          onPress={() => setAddExerciseVisible(true)}
-          w={36}
-          h={36}
-          borderRadius="$full"
-          borderWidth={1}
-          borderColor={colors.accent}
-          borderStyle="dashed"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <Ionicons name="add" size={18} color={colors.accent} />
-        </Pressable>
-      </HStack>
+      <Pressable
+        onPress={() => setPickerVisible(true)}
+        bg="$backgroundDark900"
+        borderWidth={1}
+        borderColor="$borderDark800"
+        borderRadius="$lg"
+        px="$3"
+        py="$3"
+        mb="$3"
+        flexDirection="row"
+        alignItems="center"
+        justifyContent="space-between"
+      >
+        <HStack alignItems="center" space="sm" flex={1}>
+          <Box
+            w={34}
+            h={34}
+            borderRadius="$full"
+            bg="$backgroundDark800"
+            borderWidth={1}
+            borderColor={colors.accent}
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Icon
+              name={activeExercise ? MUSCLE_ICONS[activeExercise.primaryMuscle] : 'barbell-outline'}
+              size={16}
+              color={colors.primaryLight}
+            />
+          </Box>
+          <VStack flex={1}>
+            {activeExercise && (
+              <Text color="$textDark600" size="xs" numberOfLines={1}>
+                {t(muscleLabelKey(activeExercise.primaryMuscle))}
+              </Text>
+            )}
+            <Text color="$textDark0" fontWeight="$bold" size="md" numberOfLines={1}>
+              {activeExercise?.name ?? t('workout.pickExercise')}
+            </Text>
+          </VStack>
+        </HStack>
+        <Icon name="chevron-down" size={18} color={colors.textMuted} />
+      </Pressable>
+
+      <ExercisePickerModal
+        visible={pickerVisible}
+        onClose={() => setPickerVisible(false)}
+        exercises={visibleExercises}
+        selectedExerciseId={activeExerciseId}
+        onSelect={setSelectedExerciseId}
+        onAddCustom={() => setAddExerciseVisible(true)}
+      />
 
       <AddExerciseModal
         visible={addExerciseVisible}
@@ -282,100 +289,61 @@ export default function WorkoutLogScreen() {
         />
       )}
 
-      {suggestion?.suggestedWeightKg != null && (
-        <HStack alignItems="center" space="xs" mb="$2" px="$1">
-          <Ionicons name="bulb" size={13} color={colors.accent} />
-          <Text color={colors.accent} fontWeight="$semibold" size="xs" flex={1} numberOfLines={1}>
-            {suggestion.suggestedWeightKg}kg öner ·{' '}
-            <Text color="$textDark500" size="xs">
-              {suggestion.reason}
-            </Text>
-          </Text>
-          {activeRoutineTarget && (
-            <Text color="$textDark500" size="xs" fontFamily="$mono">
-              hedef {activeRoutineTarget.targetSets}×{activeRoutineTarget.targetReps}
-            </Text>
-          )}
+      <Button
+        borderRadius="$lg"
+        bg="$primary500"
+        mb="$4"
+        isDisabled={!activeExercise}
+        onPress={() => {
+          setError(null);
+          setLogSetVisible(true);
+        }}
+      >
+        <HStack alignItems="center" space="xs">
+          <Icon name="add" size={18} color="#0E0E0E" />
+          <ButtonText>{t('workout.addSet')}</ButtonText>
         </HStack>
-      )}
+      </Button>
 
-      <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$xl" p="$3" mb="$3" {...cardShadow}>
-        <HStack space="sm" mb="$3">
-          <Input flex={1} variant="outline" size="md" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
-            <InputField
-              placeholder="Ağırlık (kg)"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numeric"
-              color="$textDark0"
-              value={weight}
-              onChangeText={setWeight}
-            />
-          </Input>
-          <Input flex={1} variant="outline" size="md" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
-            <InputField
-              placeholder="Tekrar"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numeric"
-              color="$textDark0"
-              value={reps}
-              onChangeText={setReps}
-            />
-          </Input>
-          <Input w={90} variant="outline" size="md" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
-            <InputField
-              placeholder="RPE"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numeric"
-              color="$textDark0"
-              value={rpe}
-              onChangeText={setRpe}
-            />
-          </Input>
-        </HStack>
-
-        <HStack flexWrap="wrap" mb="$3">
-          {SET_TYPES.map((t) => {
-            const active = setType === t.value;
-            return (
-              <Pressable
-                key={t.value}
-                onPress={() => setSetType(t.value)}
-                bg={active ? '$primary500' : '$backgroundDark800'}
-                borderColor={active ? '$primary500' : '$borderDark700'}
-                borderWidth={1}
-                borderRadius="$full"
-                px="$3"
-                py="$1"
-                mr="$2"
-                mb="$1"
-              >
-                <Text color={active ? '$textDark0' : '$textDark400'} size="xs" fontWeight={active ? '$bold' : '$medium'}>
-                  {t.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </HStack>
-
-        <Button borderRadius="$lg" bg="$primary500" onPress={handleLogSet} isDisabled={saving}>
-          <ButtonText>{saving ? '...' : 'Kaydet'}</ButtonText>
-        </Button>
-
-        {error && (
-          <Text color={colors.danger} size="sm" mt="$2">
-            {error}
-          </Text>
-        )}
-      </Box>
+      <LogSetModal
+        visible={logSetVisible}
+        onClose={() => setLogSetVisible(false)}
+        exerciseName={activeExercise?.name}
+        primaryMuscle={activeExercise?.primaryMuscle}
+        weight={weight}
+        reps={reps}
+        rpe={rpe}
+        setType={setType}
+        onChangeWeight={setWeight}
+        onChangeReps={setReps}
+        onChangeRpe={setRpe}
+        onChangeSetType={setSetType}
+        onSubmit={handleLogSet}
+        saving={saving}
+        error={error}
+        suggestionText={
+          suggestion?.suggestedWeightKg != null
+            ? t('workout.suggest', {
+                weight: suggestion.suggestedWeightKg,
+                reason: t(suggestion.reasonKey, suggestion.reasonParams),
+              })
+            : null
+        }
+        targetText={
+          activeRoutineTarget
+            ? t('workout.target', { sets: activeRoutineTarget.targetSets, reps: activeRoutineTarget.targetReps })
+            : null
+        }
+      />
 
       <HStack justifyContent="space-between" alignItems="center" mb="$2">
         <Text color={colors.accent} fontSize={12} fontWeight="$bold" letterSpacing={1.2} textTransform="uppercase">
-          Bugün · {activeExercise?.name ?? ''}
+          {t('workout.todaySection', { name: activeExercise?.name ?? '' })}
         </Text>
         {activeExercise && (
           <Pressable onPress={() => setHistoryVisible(true)} hitSlop={8}>
             <Text color="$textDark500" size="xs">
-              Tümünü gör
+              {t('workout.seeAll')}
             </Text>
           </Pressable>
         )}
@@ -385,7 +353,7 @@ export default function WorkoutLogScreen() {
         <Spinner color="$primary400" />
       ) : todaysSetsForExercise.length === 0 ? (
         <Text color="$textDark500" size="sm">
-          Bu egzersizde bugün henüz set kaydetmedin.
+          {t('workout.noSetsToday')}
         </Text>
       ) : (
         <FlatList
@@ -405,12 +373,12 @@ export default function WorkoutLogScreen() {
               borderColor="$borderDark800"
             >
               <Box w={24} h={24} borderRadius="$full" bg="$primary900" alignItems="center" justifyContent="center">
-                <Ionicons name="checkmark" size={14} color={colors.primaryLight} />
+                <Icon name="checkmark" size={14} color={colors.primaryLight} />
               </Box>
               <VStack flex={1}>
                 {(item.setType !== 'normal' || item.rpe != null) && (
                   <Text color="$textDark500" size="xs" fontFamily="$mono">
-                    {item.setType !== 'normal' ? SET_TYPE_LABELS[item.setType] : ''}
+                    {item.setType !== 'normal' ? t(`setType.${item.setType}`) : ''}
                     {item.setType !== 'normal' && item.rpe != null ? ' · ' : ''}
                     {item.rpe != null ? `RPE ${item.rpe}` : ''}
                   </Text>

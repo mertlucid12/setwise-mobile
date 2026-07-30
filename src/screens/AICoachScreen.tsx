@@ -1,22 +1,24 @@
 import React, { useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import { Box, HStack, Heading, Text, Input, InputField, Pressable, SafeAreaView } from '@gluestack-ui/themed';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import { AICoachMessage } from '@/types';
 import { askCoach } from '@/services/aiCoach';
 import { useWorkoutSets } from '@/hooks/useWorkoutSets';
 import { useExercises } from '@/hooks/useExercises';
 import AnimatedBackground from '@/components/AnimatedBackground';
+import { useI18n } from '@/i18n';
 import { colors } from '@/theme';
 
 export default function AICoachScreen() {
+  const { t } = useI18n();
   const { sets } = useWorkoutSets();
   const { exercises } = useExercises();
   const [messages, setMessages] = useState<AICoachMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'Selam! Antrenman verini görüyorum. Ne sormak istersin - programın, hacmin ya da bir egzersizle ilgili?',
+      content: t('coach.welcome'),
       timestamp: Date.now(),
     },
   ]);
@@ -47,7 +49,7 @@ export default function AICoachScreen() {
         {
           id: `${Date.now()}-e`,
           role: 'assistant',
-          content: 'Bağlantı sorunu oldu, backend endpoint kurulana kadar bu beklenen bir durum. src/services/aiCoach.ts dosyasına bak.',
+          content: t('coach.error'),
           timestamp: Date.now(),
         },
       ]);
@@ -63,10 +65,10 @@ export default function AICoachScreen() {
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <HStack alignItems="center" space="sm" mb="$3">
             <Box w={34} h={34} borderRadius="$full" bg="$primary900" alignItems="center" justifyContent="center">
-              <Ionicons name="sparkles" size={16} color={colors.accent} />
+              <Icon name="sparkles" size={16} color={colors.accent} />
             </Box>
             <Heading color="$textDark0" size="xl">
-              AI Koç
+              {t('coach.title')}
             </Heading>
           </HStack>
 
@@ -98,7 +100,7 @@ export default function AICoachScreen() {
           <HStack space="sm" mt="$2" alignItems="center">
             <Input flex={1} variant="outline" size="lg" borderColor="$borderDark700" borderRadius="$full" bg="$backgroundDark900">
               <InputField
-                placeholder="Bir soru sor..."
+                placeholder={t('coach.inputPlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 color="$textDark0"
                 value={input}
@@ -116,7 +118,7 @@ export default function AICoachScreen() {
               alignItems="center"
               justifyContent="center"
             >
-              <Ionicons name={loading ? 'hourglass' : 'send'} size={18} color="#fff" />
+              <Icon name={loading ? 'hourglass' : 'send'} size={18} color="#fff" />
             </Pressable>
           </HStack>
         </KeyboardAvoidingView>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Keyboard, ScrollView } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import {
   Box,
   VStack,
@@ -14,37 +15,62 @@ import {
   Spinner,
   SafeAreaView,
 } from '@gluestack-ui/themed';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
-import { useMeasurements } from '@/hooks/useMeasurements';
-import LineChart from '@/components/LineChart';
 import AnimatedBackground from '@/components/AnimatedBackground';
+import { useI18n } from '@/i18n';
 import { colors, cardShadow } from '@/theme';
+import { ExperienceLevel, Gender, MainGoal } from '@/types';
+
+function ChipGroup<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T | null;
+  options: { key: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <HStack flexWrap="wrap">
+      {options.map((opt) => (
+        <Pressable
+          key={opt.key}
+          onPress={() => onChange(opt.key)}
+          bg={value === opt.key ? '$primary500' : '$backgroundDark800'}
+          borderColor={value === opt.key ? '$primary500' : '$borderDark700'}
+          borderWidth={1}
+          borderRadius="$full"
+          px="$3"
+          py="$2"
+          mr="$2"
+          mb="$2"
+        >
+          <Text color={value === opt.key ? '$textDark0' : '$textDark400'} size="xs" fontWeight={value === opt.key ? '$bold' : '$medium'}>
+            {opt.label}
+          </Text>
+        </Pressable>
+      ))}
+    </HStack>
+  );
+}
 
 export default function ProfileScreen() {
+  const navigation = useNavigation();
+  const { t, lang, setLang } = useI18n();
   const { session, signOut } = useAuth();
   const { profile, loading, saveProfile } = useProfile();
-  const { measurements, loading: measurementsLoading, addMeasurement } = useMeasurements();
 
   const [displayName, setDisplayName] = useState('');
-  const [weight, setWeight] = useState('');
-  const [height, setHeight] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-
-  const [checkInWeight, setCheckInWeight] = useState('');
-  const [checkInWaist, setCheckInWaist] = useState('');
-  const [checkInChest, setCheckInChest] = useState('');
-  const [checkInArm, setCheckInArm] = useState('');
-  const [checkInSaving, setCheckInSaving] = useState(false);
-  const [checkInError, setCheckInError] = useState<string | null>(null);
+  const [goalWeight, setGoalWeight] = useState('');
 
   useEffect(() => {
     setDisplayName(profile.displayName ?? '');
-    setWeight(profile.weightKg != null ? String(profile.weightKg) : '');
-    setHeight(profile.heightCm != null ? String(profile.heightCm) : '');
+    setGoalWeight(profile.goalWeightKg != null ? String(profile.goalWeightKg) : '');
   }, [profile]);
 
   async function handleSave() {
@@ -53,46 +79,35 @@ export default function ProfileScreen() {
     setError(null);
     setSaved(false);
     try {
-      await saveProfile({
-        displayName: displayName.trim() || null,
-        weightKg: weight ? parseFloat(weight) : null,
-        heightCm: height ? parseFloat(height) : null,
-      });
+      await saveProfile({ ...profile, displayName: displayName.trim() || null });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Profil kaydedilemedi.');
+      setError(err instanceof Error ? err.message : t('profile.errSave'));
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleAddMeasurement() {
-    Keyboard.dismiss();
-    if (!checkInWeight && !checkInWaist && !checkInChest && !checkInArm) return;
-    setCheckInSaving(true);
-    setCheckInError(null);
+  async function updateTrainingProfile(patch: Partial<{ gender: Gender; mainGoal: MainGoal; experienceLevel: ExperienceLevel }>) {
+    setError(null);
     try {
-      await addMeasurement({
-        weightKg: checkInWeight ? parseFloat(checkInWeight) : undefined,
-        waistCm: checkInWaist ? parseFloat(checkInWaist) : undefined,
-        chestCm: checkInChest ? parseFloat(checkInChest) : undefined,
-        armCm: checkInArm ? parseFloat(checkInArm) : undefined,
-      });
-      setCheckInWeight('');
-      setCheckInWaist('');
-      setCheckInChest('');
-      setCheckInArm('');
+      await saveProfile({ ...profile, ...patch });
     } catch (err) {
-      setCheckInError(err instanceof Error ? err.message : 'Ölçüm kaydedilemedi.');
-    } finally {
-      setCheckInSaving(false);
+      setError(err instanceof Error ? err.message : t('profile.errSave'));
     }
   }
 
-  const weightSeries = measurements
-    .filter((m) => m.weightKg != null)
-    .map((m) => ({ timestamp: m.recordedAt, value: m.weightKg as number }));
+  async function handleGoalWeightBlur() {
+    const next = goalWeight ? parseFloat(goalWeight) : null;
+    if (next === profile.goalWeightKg) return;
+    setError(null);
+    try {
+      await saveProfile({ ...profile, goalWeightKg: next });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('profile.errSave'));
+    }
+  }
 
   if (loading) {
     return (
@@ -109,215 +124,196 @@ export default function ProfileScreen() {
       <Box flex={1} bg="$backgroundDark950">
         <AnimatedBackground />
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-      <Box px="$4" pt="$4" pb="$8">
-        <Text color={colors.accent} fontSize={12} fontWeight="$bold" letterSpacing={1.2} textTransform="uppercase">
-          Hesap
-        </Text>
-        <Heading color="$textDark0" size="xl" mb="$1">
-          Profil
-        </Heading>
-        <Text color="$textDark500" size="sm" mb="$5">
-          {session?.user.email}
-        </Text>
+          <Box px="$4" pt="$4" pb="$8">
+            <Text color={colors.accent} fontSize={12} fontWeight="$bold" letterSpacing={1.2} textTransform="uppercase">
+              {t('profile.account')}
+            </Text>
+            <Heading color="$textDark0" size="xl" mb="$1">
+              {t('profile.title')}
+            </Heading>
+            <Text color="$textDark500" size="sm" mb="$5">
+              {session?.user.email}
+            </Text>
 
-        <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$xl" p="$4" mb="$4" {...cardShadow}>
-          <VStack space="md">
-            <VStack space="xs">
-              <Text color="$textDark400" size="xs">
-                İsim
-              </Text>
-              <Input variant="outline" size="md" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
-                <InputField
-                  placeholder="ör. Mert"
-                  placeholderTextColor={colors.textMuted}
-                  color="$textDark0"
-                  value={displayName}
-                  onChangeText={setDisplayName}
-                />
-              </Input>
-            </VStack>
+            <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$xl" p="$4" mb="$4" {...cardShadow}>
+              <VStack space="md">
+                <VStack space="xs">
+                  <Text color="$textDark400" size="xs">
+                    {t('profile.name')}
+                  </Text>
+                  <Input variant="outline" size="md" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
+                    <InputField
+                      placeholder={t('profile.namePlaceholder')}
+                      placeholderTextColor={colors.textMuted}
+                      color="$textDark0"
+                      value={displayName}
+                      onChangeText={setDisplayName}
+                    />
+                  </Input>
+                </VStack>
 
-            <HStack space="md">
-              <VStack space="xs" flex={1}>
-                <Text color="$textDark400" size="xs">
-                  Kilo (kg)
-                </Text>
-                <Input variant="outline" size="md" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
-                  <InputField
-                    placeholder="ör. 78"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="numeric"
-                    color="$textDark0"
-                    value={weight}
-                    onChangeText={setWeight}
-                  />
-                </Input>
+                {error && (
+                  <Text color={colors.danger} size="sm">
+                    {error}
+                  </Text>
+                )}
+
+                <Button borderRadius="$lg" bg="$primary500" onPress={handleSave} isDisabled={saving}>
+                  <ButtonText>{saving ? '...' : saved ? t('common.saved') : t('common.save')}</ButtonText>
+                </Button>
               </VStack>
+            </Box>
 
-              <VStack space="xs" flex={1}>
-                <Text color="$textDark400" size="xs">
-                  Boy (cm)
+            <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$xl" p="$4" mb="$4" {...cardShadow}>
+              <HStack alignItems="center" justifyContent="space-between">
+                <Text color="$textDark0" fontWeight="$bold" size="sm">
+                  {t('profile.language')}
                 </Text>
-                <Input variant="outline" size="md" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
-                  <InputField
-                    placeholder="ör. 178"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="numeric"
-                    color="$textDark0"
-                    value={height}
-                    onChangeText={setHeight}
-                  />
-                </Input>
-              </VStack>
-            </HStack>
-
-            {error && (
-              <Text color={colors.danger} size="sm">
-                {error}
-              </Text>
-            )}
-
-            <Button borderRadius="$lg" bg="$primary500" onPress={handleSave} isDisabled={saving}>
-              <ButtonText>{saving ? '...' : saved ? 'Kaydedildi ✓' : 'Kaydet'}</ButtonText>
-            </Button>
-          </VStack>
-        </Box>
-
-        <Text color={colors.accent} fontSize={12} fontWeight="$bold" letterSpacing={1.2} textTransform="uppercase" mb="$2">
-          Vücut ölçümleri
-        </Text>
-
-        <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$xl" p="$4" mb="$4" {...cardShadow}>
-          {measurementsLoading ? (
-            <Spinner color="$primary400" />
-          ) : (
-            <VStack space="md">
-              {weightSeries.length > 1 && (
-                <Box alignItems="center">
-                  <LineChart data={weightSeries} width={280} height={110} color={colors.primaryLight} />
-                </Box>
-              )}
-
-              <HStack space="sm">
-                <VStack space="xs" flex={1}>
-                  <Text color="$textDark400" size="xs">
-                    Kilo
-                  </Text>
-                  <Input variant="outline" size="sm" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
-                    <InputField
-                      placeholder="kg"
-                      placeholderTextColor={colors.textMuted}
-                      keyboardType="numeric"
-                      color="$textDark0"
-                      value={checkInWeight}
-                      onChangeText={setCheckInWeight}
-                    />
-                  </Input>
-                </VStack>
-                <VStack space="xs" flex={1}>
-                  <Text color="$textDark400" size="xs">
-                    Bel
-                  </Text>
-                  <Input variant="outline" size="sm" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
-                    <InputField
-                      placeholder="cm"
-                      placeholderTextColor={colors.textMuted}
-                      keyboardType="numeric"
-                      color="$textDark0"
-                      value={checkInWaist}
-                      onChangeText={setCheckInWaist}
-                    />
-                  </Input>
-                </VStack>
-                <VStack space="xs" flex={1}>
-                  <Text color="$textDark400" size="xs">
-                    Göğüs
-                  </Text>
-                  <Input variant="outline" size="sm" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
-                    <InputField
-                      placeholder="cm"
-                      placeholderTextColor={colors.textMuted}
-                      keyboardType="numeric"
-                      color="$textDark0"
-                      value={checkInChest}
-                      onChangeText={setCheckInChest}
-                    />
-                  </Input>
-                </VStack>
-                <VStack space="xs" flex={1}>
-                  <Text color="$textDark400" size="xs">
-                    Kol
-                  </Text>
-                  <Input variant="outline" size="sm" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
-                    <InputField
-                      placeholder="cm"
-                      placeholderTextColor={colors.textMuted}
-                      keyboardType="numeric"
-                      color="$textDark0"
-                      value={checkInArm}
-                      onChangeText={setCheckInArm}
-                    />
-                  </Input>
-                </VStack>
-              </HStack>
-
-              {checkInError && (
-                <Text color={colors.danger} size="sm">
-                  {checkInError}
-                </Text>
-              )}
-
-              <Button
-                borderRadius="$lg"
-                variant="outline"
-                borderColor={colors.accent}
-                onPress={handleAddMeasurement}
-                isDisabled={checkInSaving}
-              >
-                <ButtonText color={colors.accent}>{checkInSaving ? '...' : 'Ölçüm ekle'}</ButtonText>
-              </Button>
-
-              {measurements.length > 0 && (
-                <VStack space="xs" mt="$2">
-                  {measurements.slice(0, 5).map((m) => (
-                    <HStack key={m.id} justifyContent="space-between" py="$1">
-                      <Text color="$textDark500" size="xs" fontFamily="$mono">
-                        {new Date(m.recordedAt).toLocaleDateString('tr-TR')}
+                <HStack bg="$backgroundDark800" borderRadius="$full" p={2} space="xs">
+                  {(['en', 'tr'] as const).map((code) => (
+                    <Pressable
+                      key={code}
+                      onPress={() => setLang(code)}
+                      bg={lang === code ? '$primary500' : 'transparent'}
+                      borderRadius="$full"
+                      px="$3"
+                      py="$1"
+                    >
+                      <Text
+                        color={lang === code ? '$textDark0' : '$textDark500'}
+                        size="xs"
+                        fontWeight={lang === code ? '$bold' : '$medium'}
+                      >
+                        {code.toUpperCase()}
                       </Text>
-                      <Text color="$textDark400" size="xs" fontFamily="$mono">
-                        {[
-                          m.weightKg != null ? `${m.weightKg}kg` : null,
-                          m.waistCm != null ? `bel ${m.waistCm}cm` : null,
-                          m.chestCm != null ? `göğüs ${m.chestCm}cm` : null,
-                          m.armCm != null ? `kol ${m.armCm}cm` : null,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </Text>
-                    </HStack>
+                    </Pressable>
                   ))}
-                </VStack>
-              )}
-            </VStack>
-          )}
-        </Box>
+                </HStack>
+              </HStack>
+            </Box>
 
-        <Pressable
-          onPress={signOut}
-          bg="$backgroundDark900"
-          borderWidth={1}
-          borderColor="$borderDark800"
-          borderRadius="$xl"
-          p="$4"
-          flexDirection="row"
-          alignItems="center"
-        >
-          <Ionicons name="log-out-outline" size={18} color={colors.danger} />
-          <Text color={colors.danger} fontWeight="$semibold" size="sm" ml="$2">
-            Çıkış yap
-          </Text>
-        </Pressable>
-      </Box>
+            <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$xl" p="$4" mb="$4" {...cardShadow}>
+              <Text color="$textDark0" fontWeight="$bold" size="sm" mb="$3">
+                {t('profile.trainingProfile')}
+              </Text>
+              <VStack space="md">
+                <VStack space="xs">
+                  <Text color="$textDark400" size="xs">
+                    {t('profile.gender')}
+                  </Text>
+                  <ChipGroup
+                    value={profile.gender}
+                    onChange={(v) => updateTrainingProfile({ gender: v })}
+                    options={[
+                      { key: 'male', label: t('onboarding.male') },
+                      { key: 'female', label: t('onboarding.female') },
+                      { key: 'unspecified', label: t('onboarding.unspecified') },
+                    ]}
+                  />
+                </VStack>
+
+                <VStack space="xs">
+                  <Text color="$textDark400" size="xs">
+                    {t('profile.mainGoal')}
+                  </Text>
+                  <ChipGroup
+                    value={profile.mainGoal}
+                    onChange={(v) => updateTrainingProfile({ mainGoal: v })}
+                    options={[
+                      { key: 'build_muscle', label: t('onboarding.goalBuildMuscle') },
+                      { key: 'lose_fat', label: t('onboarding.goalLoseFat') },
+                      { key: 'get_stronger', label: t('onboarding.goalGetStronger') },
+                      { key: 'general_fitness', label: t('onboarding.goalGeneralFitness') },
+                    ]}
+                  />
+                </VStack>
+
+                <VStack space="xs">
+                  <Text color="$textDark400" size="xs">
+                    {t('profile.experienceLevel')}
+                  </Text>
+                  <ChipGroup
+                    value={profile.experienceLevel}
+                    onChange={(v) => updateTrainingProfile({ experienceLevel: v })}
+                    options={[
+                      { key: 'beginner', label: t('onboarding.beginner') },
+                      { key: 'intermediate', label: t('onboarding.intermediate') },
+                      { key: 'advanced', label: t('onboarding.advanced') },
+                    ]}
+                  />
+                </VStack>
+
+                <VStack space="xs">
+                  <Text color="$textDark400" size="xs">
+                    {t('profile.goalWeight')}
+                  </Text>
+                  <Input variant="outline" size="md" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
+                    <InputField
+                      placeholder="72"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="numeric"
+                      color="$textDark0"
+                      value={goalWeight}
+                      onChangeText={setGoalWeight}
+                      onBlur={handleGoalWeightBlur}
+                    />
+                  </Input>
+                </VStack>
+              </VStack>
+            </Box>
+
+            <Pressable
+              onPress={() => navigation.navigate('BodyTracking' as never)}
+              bg="$backgroundDark900"
+              borderWidth={1}
+              borderColor="$borderDark800"
+              borderRadius="$xl"
+              p="$4"
+              mb="$4"
+              flexDirection="row"
+              alignItems="center"
+              {...cardShadow}
+            >
+              <Box
+                w={40}
+                h={40}
+                borderRadius="$full"
+                bg="$backgroundDark800"
+                borderWidth={1}
+                borderColor={colors.accent}
+                alignItems="center"
+                justifyContent="center"
+                mr="$3"
+              >
+                <Icon name="body-outline" size={19} color={colors.primaryLight} />
+              </Box>
+              <VStack flex={1}>
+                <Text color="$textDark0" fontWeight="$bold" size="sm">
+                  {t('profile.bodyTracking')}
+                </Text>
+                <Text color="$textDark500" size="xs">
+                  {t('profile.bodyTrackingSub')}
+                </Text>
+              </VStack>
+              <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+            </Pressable>
+
+            <Pressable
+              onPress={signOut}
+              bg="$backgroundDark900"
+              borderWidth={1}
+              borderColor="$borderDark800"
+              borderRadius="$xl"
+              p="$4"
+              flexDirection="row"
+              alignItems="center"
+            >
+              <Icon name="log-out-outline" size={18} color={colors.danger} />
+              <Text color={colors.danger} fontWeight="$semibold" size="sm" ml="$2">
+                {t('profile.signOut')}
+              </Text>
+            </Pressable>
+          </Box>
         </ScrollView>
       </Box>
     </SafeAreaView>

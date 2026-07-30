@@ -11,18 +11,23 @@ import {
   Spinner,
   SafeAreaView,
 } from '@gluestack-ui/themed';
-import { Ionicons } from '@expo/vector-icons';
-import { computeWeeklyMuscleVolume } from '@/services/volume';
+import Icon, { IconName } from '@/components/Icon';
+import { computeWeeklyMuscleVolume, computeMuscleRecovery, RecoveryStatus } from '@/services/volume';
 import { useExercises } from '@/hooks/useExercises';
 import { useWorkoutSets } from '@/hooks/useWorkoutSets';
+import { useProfile } from '@/hooks/useProfile';
+import { useI18n } from '@/i18n';
 import { MuscleVolumeSummary } from '@/types';
+import { muscleLabelKey } from '@/constants/muscleGroups';
+import BodyRecoveryMap, { RECOVERY_COLOR } from '@/components/BodyRecoveryMap';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import { colors, cardShadow } from '@/theme';
 
-const MUSCLE_LABELS: Record<string, string> = {
-  chest: 'Göğüs', back: 'Sırt', shoulders: 'Omuz', biceps: 'Biceps',
-  triceps: 'Triceps', quads: 'Ön bacak', hamstrings: 'Arka bacak',
-  glutes: 'Kalça', calves: 'Baldır', abs: 'Karın',
+const RECOVERY_LABEL_KEY: Record<RecoveryStatus, string> = {
+  untrained: 'volume.statusUntrained',
+  fatigued: 'volume.statusFatigued',
+  recovering: 'volume.statusRecovering',
+  fresh: 'volume.statusFresh',
 };
 
 const STATUS_COLOR: Record<MuscleVolumeSummary['status'], string> = {
@@ -31,21 +36,23 @@ const STATUS_COLOR: Record<MuscleVolumeSummary['status'], string> = {
   above: colors.danger,
 };
 
-const STATUS_LABEL: Record<MuscleVolumeSummary['status'], string> = {
-  below: 'Hedefin altında',
-  in_range: 'Hedefte',
-  above: 'Hedefin üstünde',
+const STATUS_LABEL_KEY: Record<MuscleVolumeSummary['status'], string> = {
+  below: 'volume.statusBelow',
+  in_range: 'volume.statusInRange',
+  above: 'volume.statusAbove',
 };
 
-const STATUS_ICON: Record<MuscleVolumeSummary['status'], keyof typeof Ionicons.glyphMap> = {
+const STATUS_ICON: Record<MuscleVolumeSummary['status'], IconName> = {
   below: 'trending-down',
   in_range: 'checkmark-circle',
   above: 'alert-circle',
 };
 
 export default function VolumeDashboardScreen() {
+  const { t } = useI18n();
   const { exercises, loading: exercisesLoading } = useExercises();
   const { sets, loading: setsLoading } = useWorkoutSets();
+  const { profile } = useProfile();
 
   if (exercisesLoading || setsLoading) {
     return (
@@ -58,25 +65,78 @@ export default function VolumeDashboardScreen() {
   }
 
   const summary = computeWeeklyMuscleVolume(sets, exercises);
+  const recovery = computeMuscleRecovery(sets, exercises);
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <Box flex={1} bg="$backgroundDark950" px="$4" pt="$4">
         <AnimatedBackground />
         <Text color={colors.accent} fontSize={12} fontWeight="$bold" letterSpacing={1.2} textTransform="uppercase">
-          Bu hafta
+          {t('volume.thisWeek')}
         </Text>
         <Heading color="$textDark0" size="xl" mb="$1">
-          Kas hacmi
+          {t('volume.title')}
         </Heading>
         <Text color="$textDark500" size="sm" mb="$4">
-          Son 7 gün, set sayısı vs hedef aralık
+          {t('volume.subtitle')}
         </Text>
 
         <FlatList
           data={summary}
           keyExtractor={(item) => item.muscle}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$xl" p="$4" mb="$4" {...cardShadow}>
+              <Text color="$textDark0" fontWeight="$bold" size="md" mb="$1">
+                {t('volume.recovery')}
+              </Text>
+              <Text color="$textDark500" size="xs" mb="$3">
+                {t('volume.recoverySubtitle')}
+              </Text>
+
+              <BodyRecoveryMap recovery={recovery} gender={profile.gender} />
+
+              <HStack space="md" mt="$3" flexWrap="wrap" justifyContent="center">
+                {(['fresh', 'recovering', 'fatigued', 'untrained'] as const).map((status) => (
+                  <HStack key={status} alignItems="center" space="xs" mr="$3" mb="$1">
+                    <Box w={8} h={8} borderRadius="$full" bg={RECOVERY_COLOR[status]} />
+                    <Text color="$textDark500" size="2xs">
+                      {t(RECOVERY_LABEL_KEY[status])}
+                    </Text>
+                  </HStack>
+                ))}
+              </HStack>
+
+              {recovery.some((r) => r.status !== 'untrained') && (
+                <HStack flexWrap="wrap" mt="$3">
+                  {recovery
+                    .filter((r) => r.status !== 'untrained')
+                    .sort((a, b) => (a.daysSinceTrained ?? 0) - (b.daysSinceTrained ?? 0))
+                    .map((r) => (
+                      <HStack
+                        key={r.muscle}
+                        alignItems="center"
+                        space="xs"
+                        bg="$backgroundDark800"
+                        borderRadius="$full"
+                        px="$3"
+                        py="$1"
+                        mr="$2"
+                        mb="$2"
+                      >
+                        <Box w={6} h={6} borderRadius="$full" bg={RECOVERY_COLOR[r.status]} />
+                        <Text color="$textDark300" size="2xs" fontWeight="$semibold">
+                          {t(muscleLabelKey(r.muscle))}
+                        </Text>
+                        <Text color="$textDark600" size="2xs" fontFamily="$mono">
+                          {r.daysSinceTrained === 0 ? t('volume.today') : t('volume.daysAgo', { days: r.daysSinceTrained ?? 0 })}
+                        </Text>
+                      </HStack>
+                    ))}
+                </HStack>
+              )}
+            </Box>
+          }
           renderItem={({ item }) => (
             <Box
               bg="$backgroundDark900"
@@ -89,12 +149,12 @@ export default function VolumeDashboardScreen() {
             >
               <HStack justifyContent="space-between" alignItems="center" mb="$2">
                 <Text color="$textDark0" fontWeight="$bold" size="md">
-                  {MUSCLE_LABELS[item.muscle]}
+                  {t(muscleLabelKey(item.muscle))}
                 </Text>
                 <HStack alignItems="center" space="xs">
-                  <Ionicons name={STATUS_ICON[item.status]} size={12} color={STATUS_COLOR[item.status]} />
+                  <Icon name={STATUS_ICON[item.status]} size={12} color={STATUS_COLOR[item.status]} />
                   <Text color={STATUS_COLOR[item.status]} fontWeight="$semibold" size="xs">
-                    {STATUS_LABEL[item.status]}
+                    {t(STATUS_LABEL_KEY[item.status])}
                   </Text>
                 </HStack>
               </HStack>
@@ -102,7 +162,7 @@ export default function VolumeDashboardScreen() {
                 <ProgressFilledTrack bg={STATUS_COLOR[item.status]} borderRadius="$full" />
               </Progress>
               <Text color="$textDark500" size="xs" mt="$2" fontFamily="$mono">
-                {item.setsThisWeek} set — hedef {item.target.min}-{item.target.max} set/hafta
+                {t('volume.setsTarget', { sets: item.setsThisWeek, min: item.target.min, max: item.target.max })}
               </Text>
             </Box>
           )}

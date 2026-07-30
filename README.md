@@ -24,12 +24,18 @@ iskeleti. Expo/React Native + TypeScript ile kuruldu, 3 ana ekranı ve çekirdek
   bulur/oluşturur) ve son N günün geçmişini çekme
 - `src/contexts/AuthContext.tsx` — Supabase auth oturum state'i (session, signIn, signUp, signOut)
 - `src/hooks/useExercises.ts`, `src/hooks/useWorkoutSets.ts` — ekranların kullandığı veri hook'ları
-- `src/screens/AuthScreen.tsx` — e-posta/şifre giriş + kayıt ekranı
+- `src/screens/AuthScreen.tsx` — e-posta/şifre giriş + kayıt ekranı; şifremi unuttum akışı,
+  şifre göster/gizle, e-posta/şifre validasyonu, kart giriş animasyonu ve kısa marka sloganı
+  içeriyor
+- `src/screens/NewPasswordScreen.tsx` — şifre sıfırlama e-postasındaki linkten (`setwise://reset-password`
+  deep link, PKCE `code` değişimi) açılan, `PASSWORD_RECOVERY` auth event'inde gösterilen yeni
+  şifre belirleme ekranı
 - `src/services/aiCoach.ts` — AI koç için backend proxy pattern (API key ASLA client'ta olmamalı)
 - `src/screens/` — Antrenman kaydı, Hacim dashboard'u, AI Koç sohbet (hepsi artık Supabase'ten
   gelen gerçek veriyle çalışıyor)
 - `src/navigation/AppNavigator.tsx` — oturum yoksa AuthScreen, varsa alt sekme navigasyonu
-  (Antrenman, Takvim, Rutinler, Hacim, AI Koç, Profil)
+  (Antrenman, Takvim, Rutinler, Hacim, AI Koç, Profil); Profil sekmesi kendi içinde küçük bir
+  stack (`ProfileMain` → `BodyTracking`) barındırıyor
 - `src/theme.ts` + `gluestack-ui` (`@gluestack-ui/themed`) — tüm ekranlar bu component
   kütüphanesiyle yeniden tasarlandı, marka rengi (yeşil/altın) `primary` skalasına özelleştirildi.
   Font çifti web dashboard'la (LiftLog `app/layout.tsx`) birebir aynı: Barlow Condensed
@@ -40,8 +46,17 @@ iskeleti. Expo/React Native + TypeScript ile kuruldu, 3 ana ekranı ve çekirdek
 - `src/screens/CalendarScreen.tsx` — aylık takvim, antrenman yapılan günleri noktayla
   işaretler; bir güne dokununca o günün setlerini ve serbest metin notunu (`workouts.notes`,
   ör. "böyle beslendim işe yaradı") gösterip düzenlemeye izin verir
-- `src/screens/ProfileScreen.tsx` — hesap bilgisi, kilo/boy, vücut ölçümleri geçmişi
-  (kilo grafiği + bel/göğüs/kol check-in), çıkış yap
+- `src/screens/ProfileScreen.tsx` — sade hesap bilgisi (isim, e-posta), "Vücut Takibi" kartı,
+  çıkış yap. Kilo/boy ve ölçüm check-in'i ana ekranda karışıklık yaratmasın diye ayrı bir
+  ekrana taşındı.
+- `src/screens/BodyTrackingScreen.tsx` — kilo/boy düzenleme, vücut ölçümleri geçmişi (kilo
+  grafiği + bel/göğüs/kol check-in); Profil ekranındaki "Vücut Takibi" kartından açılıyor,
+  ileride başka ölçümler (uyluk/kalça/baldır gibi zaten şemada olan kolonlar) buraya eklenebilir
+- `src/components/ExercisePickerModal.tsx` + `src/constants/muscleGroups.ts` — WorkoutLogScreen'de
+  egzersizler artık yan yana düz bir buton satırı yerine kas grubuna göre (Göğüs/Sırt/Omuz/...)
+  ikonlu, aranabilir bir modal listesinde; ana ekranda tek bir "seçili egzersiz" satırı bu
+  modalı açıyor
+- WorkoutLogScreen başlığında kullanıcının profildeki ilk adıyla "Hoşgeldin, {ad}" karşılaması
 - `src/screens/RoutinesScreen.tsx` — rutin (workout template) oluşturma/düzenleme,
   `routines`/`routine_exercises` tablolarını okur-yazar (web ile paylaşılan şema);
   "Başlat" `ActiveRoutineContext` üzerinden Antrenman ekranına o rutinin egzersiz
@@ -59,11 +74,12 @@ iskeleti. Expo/React Native + TypeScript ile kuruldu, 3 ana ekranı ve çekirdek
 ## Neler EKSİK (Claude Code'da devam edilecek)
 1. ~~Firestore/Supabase bağlantısı~~ — **tamamlandı.** WorkoutLogScreen artık Supabase'e
    yazıyor, açılışta son 4 haftalık geçmiş çekiliyor.
-2. ~~Kimlik doğrulama~~ — **tamamlandı**, Google OAuth dahil. `AuthContext.signInWithGoogle`
-   PKCE tabanlı `expo-auth-session` + deep-link redirect (`app.json`'daki `setwise://`
-   şeması) ile tam çalışıyor. **Doğrulanmadı:** Supabase Dashboard → Authentication →
-   URL Configuration → Redirect URLs listesinde `setwise://auth-callback`'in kayıtlı
-   olduğu kontrol edilmeli — kayıtlı değilse OAuth akışı Google'dan dönüşte hata verir.
+2. ~~Kimlik doğrulama~~ — e-posta/şifre tarafı **tamamlandı** (şifremi unuttum, e-posta onayı,
+   yeniden gönderme dahil). Google OAuth kodu yazıldı (`AuthContext.signInWithGoogle`, PKCE +
+   `setwise://auth-callback` deep link) ama **Expo Go'da temelden test edilemiyor** — özel URL
+   şemaları yalnızca gerçek bir native build'de (EAS dev-client/production) çalışır, Expo Go
+   kendi `exp://` şemasını kullanır. Google girişini gerçek anlamda doğrulamak için bir
+   dev-client/production build gerekiyor.
 3. ~~AI koç backend'i~~ — **tamamlandı.** `aiCoach` Supabase Edge Function'ı deploy edildi
    (Claude Sonnet 5 çağırıyor), `src/services/aiCoach.ts` artık
    `supabase.functions.invoke` kullanıyor. Çalışması için Supabase projesine

@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Profile } from '@/types';
-import { fetchProfile, saveProfile as saveProfileToSupabase } from '@/services/profile';
+import { EMPTY_PROFILE, fetchProfile, saveProfile as saveProfileToSupabase } from '@/services/profile';
 
 export function useProfile() {
   const { session } = useAuth();
   const userId = session?.user.id ?? null;
-  const [profile, setProfile] = useState<Profile>({ displayName: null, weightKg: null, heightCm: null });
+  const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (!userId) {
-      setProfile({ displayName: null, weightKg: null, heightCm: null });
+      setProfile(EMPTY_PROFILE);
       setLoading(false);
       return;
     }

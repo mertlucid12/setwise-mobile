@@ -19,26 +19,13 @@ import {
   ButtonText,
   Pressable,
 } from '@gluestack-ui/themed';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import { MuscleGroup } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { createCustomExercise } from '@/services/exercises';
+import { useI18n } from '@/i18n';
 import { colors } from '@/theme';
-
-const MUSCLE_LABELS: Record<MuscleGroup, string> = {
-  chest: 'Göğüs',
-  back: 'Sırt',
-  shoulders: 'Omuz',
-  biceps: 'Biceps',
-  triceps: 'Triceps',
-  quads: 'Quadriceps',
-  hamstrings: 'Hamstring',
-  glutes: 'Kalça',
-  calves: 'Baldır',
-  abs: 'Karın',
-};
-
-const ALL_MUSCLES = Object.keys(MUSCLE_LABELS) as MuscleGroup[];
+import { muscleLabelKey, ALL_MUSCLES } from '@/constants/muscleGroups';
 
 interface Props {
   visible: boolean;
@@ -75,6 +62,7 @@ function MuscleChip({
 }
 
 export default function AddExerciseModal({ visible, onClose, onCreated }: Props) {
+  const { t } = useI18n();
   const { session } = useAuth();
   const [name, setName] = useState('');
   const [primaryMuscle, setPrimaryMuscle] = useState<MuscleGroup | null>(null);
@@ -113,7 +101,7 @@ export default function AddExerciseModal({ visible, onClose, onCreated }: Props)
       reset();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Egzersiz oluşturulamadı.');
+      setError(err instanceof Error ? err.message : t('addEx.errCreate'));
     } finally {
       setSaving(false);
     }
@@ -125,10 +113,10 @@ export default function AddExerciseModal({ visible, onClose, onCreated }: Props)
       <ModalContent bg="$backgroundDark900" borderColor="$borderDark800" borderWidth={1} maxHeight="85%">
         <ModalHeader>
           <Heading color="$textDark0" size="lg">
-            Yeni egzersiz ekle
+            {t('addEx.title')}
           </Heading>
           <ModalCloseButton>
-            <Ionicons name="close" size={22} color={colors.textMuted} />
+            <Icon name="close" size={22} color={colors.textMuted} />
           </ModalCloseButton>
         </ModalHeader>
 
@@ -137,11 +125,11 @@ export default function AddExerciseModal({ visible, onClose, onCreated }: Props)
             <VStack space="md">
               <VStack space="xs">
                 <Text color="$textDark400" size="xs">
-                  İsim
+                  {t('addEx.name')}
                 </Text>
                 <Input variant="outline" size="md" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
                   <InputField
-                    placeholder="ör. Kablo Çapraz"
+                    placeholder={t('addEx.namePlaceholder')}
                     placeholderTextColor={colors.textMuted}
                     color="$textDark0"
                     value={name}
@@ -152,13 +140,13 @@ export default function AddExerciseModal({ visible, onClose, onCreated }: Props)
 
               <VStack space="xs">
                 <Text color="$textDark400" size="xs">
-                  Ana kas grubu
+                  {t('addEx.primaryMuscle')}
                 </Text>
                 <HStack flexWrap="wrap">
                   {ALL_MUSCLES.map((muscle) => (
                     <MuscleChip
                       key={muscle}
-                      label={MUSCLE_LABELS[muscle]}
+                      label={t(muscleLabelKey(muscle))}
                       selected={primaryMuscle === muscle}
                       onPress={() => setPrimaryMuscle(muscle)}
                     />
@@ -168,13 +156,13 @@ export default function AddExerciseModal({ visible, onClose, onCreated }: Props)
 
               <VStack space="xs">
                 <Text color="$textDark400" size="xs">
-                  İkincil kas grupları (opsiyonel)
+                  {t('addEx.secondaryMuscles')}
                 </Text>
                 <HStack flexWrap="wrap">
                   {ALL_MUSCLES.filter((m) => m !== primaryMuscle).map((muscle) => (
                     <MuscleChip
                       key={muscle}
-                      label={MUSCLE_LABELS[muscle]}
+                      label={t(muscleLabelKey(muscle))}
                       selected={secondaryMuscles.includes(muscle)}
                       onPress={() => toggleSecondary(muscle)}
                     />
@@ -184,11 +172,11 @@ export default function AddExerciseModal({ visible, onClose, onCreated }: Props)
 
               <VStack space="xs">
                 <Text color="$textDark400" size="xs">
-                  Ekipman (opsiyonel)
+                  {t('addEx.equipment')}
                 </Text>
                 <Input variant="outline" size="md" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
                   <InputField
-                    placeholder="ör. Kablo, Dambıl, Vücut ağırlığı"
+                    placeholder={t('addEx.equipmentPlaceholder')}
                     placeholderTextColor={colors.textMuted}
                     color="$textDark0"
                     value={equipment}
@@ -218,7 +206,7 @@ export default function AddExerciseModal({ visible, onClose, onCreated }: Props)
                 onClose();
               }}
             >
-              <ButtonText color="$textDark400">Vazgeç</ButtonText>
+              <ButtonText color="$textDark400">{t('common.cancel')}</ButtonText>
             </Button>
             <Button
               flex={1}
@@ -227,7 +215,7 @@ export default function AddExerciseModal({ visible, onClose, onCreated }: Props)
               onPress={handleSave}
               isDisabled={saving || !name.trim() || !primaryMuscle}
             >
-              <ButtonText>{saving ? '...' : 'Kaydet'}</ButtonText>
+              <ButtonText>{saving ? '...' : t('common.save')}</ButtonText>
             </Button>
           </HStack>
         </ModalFooter>

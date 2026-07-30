@@ -15,16 +15,18 @@ import {
   Spinner,
   SafeAreaView,
 } from '@gluestack-ui/themed';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '@/components/Icon';
 import { useRoutines } from '@/hooks/useRoutines';
 import { useExercises } from '@/hooks/useExercises';
 import { useActiveRoutine } from '@/contexts/ActiveRoutineContext';
+import { useI18n } from '@/i18n';
 import AddRoutineExerciseModal from '@/components/AddRoutineExerciseModal';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import { Routine } from '@/types';
 import { colors, cardShadow } from '@/theme';
 
 export default function RoutinesScreen() {
+  const { t } = useI18n();
   const { routines, loading, createRoutine, deleteRoutine, addExerciseToRoutine, removeExerciseFromRoutine } =
     useRoutines();
   const { exercises } = useExercises();
@@ -45,7 +47,7 @@ export default function RoutinesScreen() {
       setCreating(false);
       setExpandedId(routine.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Rutin oluşturulamadı.');
+      setError(err instanceof Error ? err.message : t('routines.errCreate'));
     }
   }
 
@@ -71,10 +73,10 @@ export default function RoutinesScreen() {
         <HStack justifyContent="space-between" alignItems="flex-start" mb="$4">
           <VStack>
             <Text color={colors.accent} fontSize={12} fontWeight="$bold" letterSpacing={1.2} textTransform="uppercase">
-              Planla
+              {t('routines.plan')}
             </Text>
             <Heading color="$textDark0" size="xl">
-              Rutinler
+              {t('routines.title')}
             </Heading>
           </VStack>
           <Pressable
@@ -88,7 +90,7 @@ export default function RoutinesScreen() {
             alignItems="center"
             justifyContent="center"
           >
-            <Ionicons name={creating ? 'close' : 'add'} size={18} color={colors.accent} />
+            <Icon name={creating ? 'close' : 'add'} size={18} color={colors.accent} />
           </Pressable>
         </HStack>
 
@@ -96,7 +98,7 @@ export default function RoutinesScreen() {
           <HStack space="sm" mb="$4">
             <Input flex={1} variant="outline" size="md" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
               <InputField
-                placeholder="ör. İtiş günü"
+                placeholder={t('routines.placeholder')}
                 placeholderTextColor={colors.textMuted}
                 color="$textDark0"
                 value={newTitle}
@@ -105,7 +107,7 @@ export default function RoutinesScreen() {
               />
             </Input>
             <Button borderRadius="$lg" bg="$primary500" onPress={handleCreate} px="$4">
-              <ButtonText>Oluştur</ButtonText>
+              <ButtonText>{t('routines.create')}</ButtonText>
             </Button>
           </HStack>
         )}
@@ -119,8 +121,7 @@ export default function RoutinesScreen() {
         {routines.length === 0 && !creating && (
           <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$xl" p="$4">
             <Text color="$textDark400" size="sm">
-              Henüz bir rutinin yok. Sağ üstteki + ile bir tane oluştur — egzersizlerini ve hedef set/tekrar
-              sayılarını önceden planla, antrenman gününde tek dokunuşla başlat.
+              {t('routines.empty')}
             </Text>
           </Box>
         )}
@@ -144,14 +145,14 @@ export default function RoutinesScreen() {
                       {item.title}
                     </Text>
                     <Text color="$textDark500" size="xs">
-                      {item.exercises.length} egzersiz
+                      {t('routines.exerciseCount', { count: item.exercises.length })}
                     </Text>
                   </VStack>
                   <HStack space="md" alignItems="center">
                     <Pressable onPress={() => deleteRoutine(item.id)} hitSlop={8}>
-                      <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
+                      <Icon name="trash-outline" size={18} color={colors.textMuted} />
                     </Pressable>
-                    <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
+                    <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
                   </HStack>
                 </Pressable>
 
@@ -174,7 +175,7 @@ export default function RoutinesScreen() {
                           {ex.targetSets} × {ex.targetReps}
                         </Text>
                         <Pressable onPress={() => removeExerciseFromRoutine(item.id, ex.id)} hitSlop={8}>
-                          <Ionicons name="close" size={16} color={colors.textMuted} />
+                          <Icon name="close" size={16} color={colors.textMuted} />
                         </Pressable>
                       </HStack>
                     ))}
@@ -190,7 +191,7 @@ export default function RoutinesScreen() {
                       mt="$1"
                     >
                       <Text color={colors.accent} size="xs" fontWeight="$bold">
-                        + Egzersiz ekle
+                        {t('routines.addExercise')}
                       </Text>
                     </Pressable>
 
@@ -201,7 +202,7 @@ export default function RoutinesScreen() {
                       onPress={() => handleStart(item)}
                       isDisabled={item.exercises.length === 0}
                     >
-                      <ButtonText>Başlat</ButtonText>
+                      <ButtonText>{t('routines.start')}</ButtonText>
                     </Button>
                   </VStack>
                 )}

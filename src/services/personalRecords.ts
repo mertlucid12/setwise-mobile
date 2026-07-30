@@ -2,7 +2,8 @@ import { SetEntry } from '@/types';
 
 export interface PersonalRecord {
   kind: 'weight' | 'volume';
-  message: string;
+  messageKey: string;
+  messageParams: Record<string, string | number>;
 }
 
 /**
@@ -18,13 +19,17 @@ export function detectPersonalRecord(newSet: SetEntry, priorSets: SetEntry[]): P
 
   const prevMaxWeight = Math.max(...history.map((s) => s.weightKg));
   if (newSet.weightKg > prevMaxWeight) {
-    return { kind: 'weight', message: `Yeni ağırlık rekoru! Önceki en iyi: ${prevMaxWeight}kg` };
+    return { kind: 'weight', messageKey: 'pr.weight', messageParams: { prev: prevMaxWeight } };
   }
 
   const newVolume = newSet.weightKg * newSet.reps;
   const prevMaxVolume = Math.max(...history.map((s) => s.weightKg * s.reps));
   if (newVolume > prevMaxVolume) {
-    return { kind: 'volume', message: `Yeni set hacmi rekoru! ${newSet.weightKg}kg × ${newSet.reps} tekrar` };
+    return {
+      kind: 'volume',
+      messageKey: 'pr.volume',
+      messageParams: { weight: newSet.weightKg, reps: newSet.reps },
+    };
   }
 
   return null;

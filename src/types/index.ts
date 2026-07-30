@@ -66,10 +66,19 @@ export interface AICoachMessage {
   timestamp: number;
 }
 
+export type Gender = 'male' | 'female' | 'unspecified';
+export type MainGoal = 'build_muscle' | 'lose_fat' | 'get_stronger' | 'general_fitness';
+export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
+
 export interface Profile {
   displayName: string | null;
   weightKg: number | null;
   heightCm: number | null;
+  gender: Gender | null;
+  mainGoal: MainGoal | null;
+  experienceLevel: ExperienceLevel | null;
+  goalWeightKg: number | null;
+  onboardingCompleted: boolean;
 }
 
 export interface RoutineExercise {
