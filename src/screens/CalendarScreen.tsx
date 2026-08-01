@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, ScrollView } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import {
   Box,
   VStack,
@@ -15,10 +16,15 @@ import {
   SafeAreaView,
 } from '@gluestack-ui/themed';
 import Icon from '@/components/Icon';
+import DayAddSheet from '@/components/DayAddSheet';
 import { useCalendarRange } from '@/hooks/useCalendarMonth';
 import { useExercises } from '@/hooks/useExercises';
+import { useRoutines } from '@/hooks/useRoutines';
+import { useRoutineSchedules } from '@/hooks/useRoutineSchedules';
+import { useWorkoutSets } from '@/hooks/useWorkoutSets';
+import { useActiveRoutine } from '@/contexts/ActiveRoutineContext';
 import { fetchSetsForWorkout } from '@/services/workouts';
-import { SetEntry } from '@/types';
+import { Routine, SetEntry, Weekday } from '@/types';
 import { MUSCLE_ICONS, muscleLabelKey } from '@/constants/muscleGroups';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import { useI18n } from '@/i18n';
@@ -32,8 +38,8 @@ function daysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
 
-function mondayFirstIndex(jsDay: number): number {
-  return (jsDay + 6) % 7;
+function mondayFirstIndex(jsDay: number): Weekday {
+  return ((jsDay + 6) % 7) as Weekday;
 }
 
 function addDays(d: Date, n: number): Date {
@@ -52,18 +58,20 @@ type ViewMode = 'week' | 'month';
 
 export default function CalendarScreen() {
   const { t, tArr, dateLocale } = useI18n();
+  const navigation = useNavigation();
   const monthLabels = tArr('calendar.months');
   const weekdayLabels = tArr('calendar.weekdays');
   const today = useMemo(() => new Date(), []);
   const todayKey = toDateKey(today);
 
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [anchor, setAnchor] = useState(() => new Date(today.getFullYear(), today.getMonth(), today.getDate()));
-  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(todayKey);
   const [daySets, setDaySets] = useState<SetEntry[]>([]);
   const [daySetsLoading, setDaySetsLoading] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
@@ -78,17 +86,36 @@ export default function CalendarScreen() {
     return [new Date(year, month, 1).getTime(), new Date(year, month + 1, 1).getTime()];
   }, [viewMode, weekStart, year, month]);
 
-  const { days, loading, saveNotes } = useCalendarRange(rangeStartMs, rangeEndMs);
+  const { days, loading, saveNotes, reload: reloadDays } = useCalendarRange(rangeStartMs, rangeEndMs);
   const { exercises } = useExercises();
+  const { routines } = useRoutines();
+  const { routineIdsByWeekday, toggleWeekday, reload: reloadSchedules } = useRoutineSchedules();
+  const { logSet } = useWorkoutSets();
+  const { startRoutine } = useActiveRoutine();
+
+  // Schedules are edited on the routine detail screen, so this tab has to
+  // refetch when it comes back into focus or the grid shows a stale plan.
+  useFocusEffect(
+    useCallback(() => {
+      reloadSchedules();
+    }, [reloadSchedules])
+  );
 
   const dayByKey = useMemo(() => new Map(days.map((d) => [d.dateKey, d])), [days]);
-  const selectedDay = selectedDateKey ? dayByKey.get(selectedDateKey) ?? null : null;
+  const routineById = useMemo(() => new Map(routines.map((r) => [r.id, r])), [routines]);
 
-  // Dropping the selection when the visible range moves avoids showing a
-  // detail card for a day that's no longer on screen.
-  useEffect(() => {
-    setSelectedDateKey(null);
-  }, [rangeStartMs, rangeEndMs]);
+  const plannedFor = useCallback(
+    (date: Date): Routine[] =>
+      (routineIdsByWeekday.get(mondayFirstIndex(date.getDay())) ?? [])
+        .map((id) => routineById.get(id))
+        .filter((r): r is Routine => r != null),
+    [routineIdsByWeekday, routineById]
+  );
+
+  const selectedDate = selectedDateKey ? new Date(`${selectedDateKey}T00:00:00`) : null;
+  const selectedDay = selectedDateKey ? dayByKey.get(selectedDateKey) ?? null : null;
+  const selectedPlanned = selectedDate ? plannedFor(selectedDate) : [];
+  const selectedIsFuture = selectedDateKey ? selectedDateKey > todayKey : false;
 
   useEffect(() => {
     if (!selectedDay) {
@@ -119,10 +146,7 @@ export default function CalendarScreen() {
     );
   }
 
-  const weekDates = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
-    [weekStart]
-  );
+  const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
   const leadingBlanks = mondayFirstIndex(new Date(year, month, 1).getDay());
   const monthCells: (number | null)[] = [
@@ -130,40 +154,56 @@ export default function CalendarScreen() {
     ...Array.from({ length: daysInMonth(year, month) }, (_, i) => i + 1),
   ];
 
-  const selectedDateLabel = selectedDay
-    ? new Date(`${selectedDay.dateKey}T00:00:00`).toLocaleDateString(dateLocale, {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-      })
-    : null;
+  const selectedDateLabel = selectedDate
+    ? selectedDate.toLocaleDateString(dateLocale, { weekday: 'long', day: 'numeric', month: 'long' })
+    : '';
 
-  function DayCircle({ date, compact }: { date: Date; compact: boolean }) {
+  function handleStartRoutine(routine: Routine) {
+    startRoutine(routine);
+    navigation.navigate('Antrenman' as never);
+  }
+
+  /**
+   * One grid cell. Two independent signals stack here: a crimson bar means a
+   * routine is planned for that weekday, a gold dot means work was actually
+   * logged - so a planned-but-missed day reads differently from a done one.
+   */
+  function DayCell({ date, compact }: { date: Date; compact: boolean }) {
     const dateKey = toDateKey(date);
     const hasWorkout = dayByKey.has(dateKey);
+    const planned = plannedFor(date);
     const isToday = dateKey === todayKey;
     const isSelected = dateKey === selectedDateKey;
+
     return (
       <Pressable
-        onPress={() => hasWorkout && setSelectedDateKey(isSelected ? null : dateKey)}
+        onPress={() => setSelectedDateKey(dateKey)}
         flex={compact ? undefined : 1}
-        w={compact ? 38 : undefined}
-        h={compact ? 38 : undefined}
-        aspectRatio={compact ? undefined : 1}
-        borderRadius="$full"
+        w={compact ? 42 : undefined}
+        h={compact ? 52 : undefined}
+        borderRadius="$xl"
         alignItems="center"
         justifyContent="center"
-        bg={isSelected ? '$primary500' : hasWorkout ? '$primary900' : 'transparent'}
-        borderWidth={isToday ? 1.5 : 0}
-        borderColor={colors.accent}
+        bg={isSelected ? colors.primary : hasWorkout ? '$primary900' : 'transparent'}
+        borderWidth={isToday && !isSelected ? 1.5 : 1}
+        borderColor={isToday && !isSelected ? colors.accent : isSelected ? colors.accent : 'transparent'}
+        py="$1"
       >
         <Text
-          color={isSelected ? '$textDark0' : hasWorkout ? colors.primaryLight : '$textDark600'}
-          fontWeight={hasWorkout || isSelected ? '$bold' : '$normal'}
-          size="sm"
+          color={isSelected ? '$textDark0' : hasWorkout ? colors.primaryLight : '$textDark500'}
+          fontWeight={hasWorkout || isSelected || isToday ? '$bold' : '$normal'}
+          fontSize={13}
+          fontFamily="$mono"
         >
           {date.getDate()}
         </Text>
+
+        <HStack space="xs" mt="$1" h={5} alignItems="center">
+          {planned.length > 0 && (
+            <Box w={planned.length > 1 ? 12 : 7} h={3} borderRadius="$full" bg={isSelected ? '#FFFFFF' : colors.primaryLight} />
+          )}
+          {hasWorkout && <Box w={5} h={5} borderRadius="$full" bg={colors.accent} />}
+        </HStack>
       </Pressable>
     );
   }
@@ -183,7 +223,7 @@ export default function CalendarScreen() {
         </Text>
 
         <ScrollView showsVerticalScrollIndicator={false}>
-          <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$xl" p="$4" mb="$4" {...cardShadow}>
+          <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$2xl" p="$4" mb="$4" {...cardShadow}>
             <HStack alignItems="center" justifyContent="space-between" mb="$4">
               <HStack alignItems="center" space="sm">
                 <Heading color="$textDark0" size="md">
@@ -192,18 +232,12 @@ export default function CalendarScreen() {
                 <Pressable
                   onPress={() => setViewMode((m) => (m === 'week' ? 'month' : 'week'))}
                   hitSlop={10}
-                  flexDirection="row"
-                  alignItems="center"
                   bg="$backgroundDark800"
                   borderRadius="$full"
                   px="$2"
                   py="$1"
                 >
-                  <Icon
-                    name={viewMode === 'week' ? 'chevron-down' : 'chevron-up'}
-                    size={14}
-                    color={colors.accent}
-                  />
+                  <Icon name={viewMode === 'week' ? 'chevron-down' : 'chevron-up'} size={14} color={colors.accent} />
                 </Pressable>
               </HStack>
 
@@ -246,7 +280,7 @@ export default function CalendarScreen() {
                     <Text color="$textDark600" size="2xs" fontWeight="$bold" letterSpacing={0.5} textTransform="uppercase">
                       {weekdayLabels[mondayFirstIndex(date.getDay())]}
                     </Text>
-                    <DayCircle date={date} compact />
+                    <DayCell date={date} compact />
                   </VStack>
                 ))}
               </HStack>
@@ -264,22 +298,38 @@ export default function CalendarScreen() {
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                   {monthCells.map((day, idx) =>
                     day == null ? (
-                      <View key={`blank-${idx}`} style={{ width: `${100 / 7}%`, aspectRatio: 1 }} />
+                      <View key={`blank-${idx}`} style={{ width: `${100 / 7}%`, height: 52 }} />
                     ) : (
-                      <View key={day} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 3 }}>
-                        <DayCircle date={new Date(year, month, day)} compact={false} />
+                      <View key={day} style={{ width: `${100 / 7}%`, height: 52, padding: 2 }}>
+                        <DayCell date={new Date(year, month, day)} compact={false} />
                       </View>
                     )
                   )}
                 </View>
               </>
             )}
+
+            {/* Legend - two marks that mean different things needs saying once. */}
+            <HStack space="md" mt="$3" pt="$3" borderTopWidth={1} borderTopColor="$borderDark800" alignItems="center">
+              <HStack alignItems="center" space="xs">
+                <Box w={10} h={3} borderRadius="$full" bg={colors.primaryLight} />
+                <Text color="$textDark600" fontSize={10} textTransform="uppercase" letterSpacing={0.5}>
+                  {t('calendar.legendPlanned')}
+                </Text>
+              </HStack>
+              <HStack alignItems="center" space="xs">
+                <Box w={5} h={5} borderRadius="$full" bg={colors.accent} />
+                <Text color="$textDark600" fontSize={10} textTransform="uppercase" letterSpacing={0.5}>
+                  {t('calendar.legendDone')}
+                </Text>
+              </HStack>
+            </HStack>
           </Box>
 
-          {selectedDay ? (
-            <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$xl" p="$4" mb="$6" {...cardShadow}>
+          {selectedDateKey && (
+            <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$2xl" p="$4" mb="$6" {...cardShadow}>
               <HStack alignItems="center" justifyContent="space-between" mb="$3">
-                <Text color="$textDark0" fontWeight="$bold" size="md" textTransform="capitalize">
+                <Text color="$textDark0" fontWeight="$bold" size="md" textTransform="capitalize" flex={1}>
                   {selectedDateLabel}
                 </Text>
                 {daySets.length > 0 && (
@@ -291,16 +341,62 @@ export default function CalendarScreen() {
                 )}
               </HStack>
 
+              {/* Planned routines for this weekday */}
+              {selectedPlanned.length > 0 && (
+                <VStack space="xs" mb="$4">
+                  <Text color={colors.accent} fontSize={11} fontWeight="$bold" letterSpacing={1} textTransform="uppercase">
+                    {t('calendar.planned')}
+                  </Text>
+                  {selectedPlanned.map((routine) => (
+                    <HStack
+                      key={routine.id}
+                      alignItems="center"
+                      space="sm"
+                      bg="$backgroundDark800"
+                      borderWidth={1}
+                      borderLeftWidth={3}
+                      borderColor="$borderDark700"
+                      borderLeftColor={colors.primary}
+                      borderRadius="$lg"
+                      px="$3"
+                      py="$2"
+                    >
+                      <VStack flex={1}>
+                        <Text color="$textDark0" size="sm" fontWeight="$bold" numberOfLines={1}>
+                          {routine.title}
+                        </Text>
+                        <Text color={colors.textMuted} fontSize={11}>
+                          {t('routines.exerciseCount', { count: routine.exercises.length })}
+                        </Text>
+                      </VStack>
+                      {!selectedIsFuture && routine.exercises.length > 0 && (
+                        <Pressable
+                          onPress={() => handleStartRoutine(routine)}
+                          bg={colors.primary}
+                          borderRadius="$lg"
+                          px="$3"
+                          py="$1"
+                        >
+                          <Text color="$textDark0" fontSize={11} fontWeight="$black" textTransform="uppercase">
+                            {t('routines.start')}
+                          </Text>
+                        </Pressable>
+                      )}
+                    </HStack>
+                  ))}
+                </VStack>
+              )}
+
+              {/* Logged sets */}
               {daySetsLoading ? (
                 <Box py="$3" alignItems="center">
                   <Spinner color="$primary400" />
                 </Box>
-              ) : daySets.length === 0 ? (
-                <Text color="$textDark500" size="sm" mb="$3">
-                  {t('calendar.noSets')}
-                </Text>
-              ) : (
+              ) : daySets.length > 0 ? (
                 <VStack space="xs" mb="$4">
+                  <Text color={colors.accent} fontSize={11} fontWeight="$bold" letterSpacing={1} textTransform="uppercase">
+                    {t('calendar.logged')}
+                  </Text>
                   {daySets.map((s) => {
                     const exercise = exercises.find((e) => e.id === s.exerciseId);
                     return (
@@ -317,7 +413,7 @@ export default function CalendarScreen() {
                           <Box
                             w={26}
                             h={26}
-                            borderRadius="$full"
+                            borderRadius="$md"
                             bg="$backgroundDark900"
                             borderWidth={1}
                             borderColor="$borderDark700"
@@ -348,45 +444,76 @@ export default function CalendarScreen() {
                     );
                   })}
                 </VStack>
+              ) : (
+                selectedPlanned.length === 0 && (
+                  <Text color="$textDark500" size="sm" mb="$4">
+                    {selectedIsFuture ? t('calendar.emptyFuture') : t('calendar.noSets')}
+                  </Text>
+                )
               )}
 
-              <Text color="$textDark400" size="xs" mb="$1">
-                {t('calendar.noteLabel')}
-              </Text>
-              <Textarea size="md" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800" mb="$3">
-                <TextareaInput
-                  placeholder={t('calendar.notePlaceholder')}
-                  placeholderTextColor={colors.textMuted}
-                  color="$textDark0"
-                  value={notesDraft}
-                  onChangeText={setNotesDraft}
-                />
-              </Textarea>
-              <Button borderRadius="$lg" bg="$primary500" onPress={handleSaveNotes} isDisabled={savingNotes}>
-                <ButtonText>{savingNotes ? '...' : t('calendar.saveNote')}</ButtonText>
+              <Button borderRadius="$xl" bg="$primary500" mb="$4" onPress={() => setSheetOpen(true)}>
+                <HStack alignItems="center" space="xs">
+                  <Icon name="add" size={17} color="#FFFFFF" />
+                  <ButtonText fontWeight="$black" letterSpacing={1} textTransform="uppercase">
+                    {t('calendar.addToDay')}
+                  </ButtonText>
+                </HStack>
               </Button>
+
+              {selectedDay && (
+                <>
+                  <Text color="$textDark400" size="xs" mb="$1">
+                    {t('calendar.noteLabel')}
+                  </Text>
+                  <Textarea size="md" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800" mb="$3">
+                    <TextareaInput
+                      placeholder={t('calendar.notePlaceholder')}
+                      placeholderTextColor={colors.textMuted}
+                      color="$textDark0"
+                      value={notesDraft}
+                      onChangeText={setNotesDraft}
+                    />
+                  </Textarea>
+                  <Button
+                    borderRadius="$xl"
+                    variant="outline"
+                    borderColor="$borderDark700"
+                    onPress={handleSaveNotes}
+                    isDisabled={savingNotes}
+                  >
+                    <ButtonText color="$textDark0">{savingNotes ? '...' : t('calendar.saveNote')}</ButtonText>
+                  </Button>
+                </>
+              )}
             </Box>
-          ) : (
-            !loading &&
-            days.length > 0 && (
-              <HStack
-                bg="$backgroundDark900"
-                borderWidth={1}
-                borderColor="$borderDark800"
-                borderRadius="$xl"
-                p="$4"
-                mb="$6"
-                alignItems="center"
-                space="sm"
-              >
-                <Icon name="finger-print-outline" size={16} color={colors.textMuted} />
-                <Text color="$textDark500" size="xs" flex={1}>
-                  {t('calendar.tapHint')}
-                </Text>
-              </HStack>
-            )
           )}
         </ScrollView>
+
+        {selectedDateKey && selectedDate && (
+          <DayAddSheet
+            visible={sheetOpen}
+            onClose={() => setSheetOpen(false)}
+            dateKey={selectedDateKey}
+            dateLabel={selectedDateLabel}
+            weekday={mondayFirstIndex(selectedDate.getDay())}
+            weekdayLabel={selectedDate.toLocaleDateString(dateLocale, { weekday: 'long' })}
+            isFuture={selectedIsFuture}
+            routines={routines}
+            exercises={exercises}
+            scheduledRoutineIds={selectedPlanned.map((r) => r.id)}
+            onScheduleRoutine={async (routineId) => {
+              await toggleWeekday(routineId, mondayFirstIndex(selectedDate.getDay()));
+            }}
+            onLogSet={async (exerciseId, name, weightKg, reps) => {
+              await logSet(exerciseId, name, weightKg, reps, 'normal', undefined, selectedDateKey);
+              await reloadDays();
+              if (selectedDay) {
+                setDaySets(await fetchSetsForWorkout(selectedDay.workoutId));
+              }
+            }}
+          />
+        )}
       </Box>
     </SafeAreaView>
   );

@@ -7,6 +7,7 @@ import Icon, { IconName } from '@/components/Icon';
 import WorkoutLogScreen from '@/screens/WorkoutLogScreen';
 import CalendarScreen from '@/screens/CalendarScreen';
 import RoutinesScreen from '@/screens/RoutinesScreen';
+import RoutineDetailScreen from '@/screens/RoutineDetailScreen';
 import VolumeDashboardScreen from '@/screens/VolumeDashboardScreen';
 import AICoachScreen from '@/screens/AICoachScreen';
 import ProfileScreen from '@/screens/ProfileScreen';
@@ -23,6 +24,18 @@ import { colors, cardShadow } from '@/theme';
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
+const RoutinesStack = createNativeStackNavigator();
+
+// The detail screen draws its own hero under the status bar, so the stack
+// header stays off and back navigation lives in the hero itself.
+function RoutinesStackNavigator() {
+  return (
+    <RoutinesStack.Navigator screenOptions={{ headerShown: false }}>
+      <RoutinesStack.Screen name="RoutinesList" component={RoutinesScreen} />
+      <RoutinesStack.Screen name="RoutineDetail" component={RoutineDetailScreen} />
+    </RoutinesStack.Navigator>
+  );
+}
 
 function ProfileStackNavigator() {
   return (
@@ -51,7 +64,7 @@ const TAB_META: Record<string, { icon: IconName; labelKey: string }> = {
 
 const TransitionedWorkoutLog = withScreenTransition(WorkoutLogScreen);
 const TransitionedCalendar = withScreenTransition(CalendarScreen);
-const TransitionedRoutines = withScreenTransition(RoutinesScreen);
+const TransitionedRoutines = withScreenTransition(RoutinesStackNavigator);
 const TransitionedVolume = withScreenTransition(VolumeDashboardScreen);
 const TransitionedCoach = withScreenTransition(AICoachScreen);
 const TransitionedProfileStack = withScreenTransition(ProfileStackNavigator);

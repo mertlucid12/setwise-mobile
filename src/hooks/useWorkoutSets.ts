@@ -40,11 +40,15 @@ export function useWorkoutSets() {
     weightKg: number,
     reps: number,
     setType: SetType = 'normal',
-    rpe?: number
+    rpe?: number,
+    /** 'YYYY-MM-DD' when back-filling a past day from the calendar. */
+    dateKey?: string
   ): Promise<PersonalRecord | null> {
     if (!userId) throw new Error('Oturum açık değil.');
-    const entry = await logSetToSupabase({ userId, exerciseId, exerciseName, weightKg, reps, setType, rpe });
-    const pr = detectPersonalRecord(entry, sets);
+    const entry = await logSetToSupabase({ userId, exerciseId, exerciseName, weightKg, reps, setType, rpe, dateKey });
+    // A back-filled set isn't "news" - announcing a PR for a session logged
+    // days late would be misleading, so PR detection stays on live logging.
+    const pr = dateKey ? null : detectPersonalRecord(entry, sets);
     setSets((prev) => [entry, ...prev]);
     return pr;
   }

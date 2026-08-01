@@ -96,6 +96,15 @@ export interface Routine {
   exercises: RoutineExercise[];
 }
 
+/** 0 = Monday .. 6 = Sunday, matching the app's Monday-first calendar grid. */
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export interface RoutineSchedule {
+  id: string;
+  routineId: string;
+  weekday: Weekday;
+}
+
 export interface WorkoutDay {
   workoutId: string;
   dateKey: string; // 'YYYY-MM-DD', local calendar date

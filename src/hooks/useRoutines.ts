@@ -79,5 +79,14 @@ export function useRoutines() {
     );
   }
 
-  return { routines, loading, error, createRoutine, deleteRoutine, addExerciseToRoutine, removeExerciseFromRoutine };
+  return {
+    routines,
+    loading,
+    error,
+    reload,
+    createRoutine,
+    deleteRoutine,
+    addExerciseToRoutine,
+    removeExerciseFromRoutine,
+  };
 }

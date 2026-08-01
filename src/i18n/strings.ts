@@ -65,6 +65,7 @@ export const en: Dict = {
   'auth.resendConfirmation': 'Resend confirmation email',
   'auth.resendSent': 'Confirmation email resent',
   'auth.confirmTitle': 'Confirm your email',
+  'auth.confirmKicker': 'One step left',
   'auth.confirmBody': 'We sent a confirmation link to {email}. Tap it to activate your account, then sign in here.',
   'auth.confirmResent': 'Confirmation email resent.',
 
@@ -136,14 +137,57 @@ export const en: Dict = {
   'routines.empty':
     "You don't have a routine yet. Create one with + at the top right — plan your exercises and target sets/reps in advance, then start with one tap on workout day.",
   'routines.exerciseCount': '{count} exercises',
+  'routines.setCount': '{count} sets',
   'routines.addExercise': '+ Add exercise',
   'routines.start': 'Start',
   'routines.errCreate': 'Could not create routine.',
+
+  // routine detail
+  'routineDetail.label': 'Routine',
+  'routineDetail.back': 'Go back',
+  'routineDetail.notFound': 'This routine no longer exists.',
+  'routineDetail.duration': 'Duration',
+  'routineDetail.sets': 'Sets',
+  'routineDetail.exercisesStat': 'Moves',
+  'routineDetail.minutesShort': 'min',
+  // calendar day planning
+  'calendar.planned': 'Planned',
+  'calendar.logged': 'Logged',
+  'calendar.legendPlanned': 'Planned',
+  'calendar.legendDone': 'Done',
+  'calendar.addToDay': 'Add to this day',
+  'calendar.emptyFuture': 'Nothing planned for this day yet.',
+
+  // day add sheet
+  'dayAdd.kicker': 'Add to',
+  'dayAdd.routineTitle': 'Schedule a routine',
+  'dayAdd.routineBody': 'Repeats every {day}',
+  'dayAdd.exerciseTitle': 'Log an exercise',
+  'dayAdd.exerciseBody': 'Record a set on this day',
+  'dayAdd.exerciseFuture': "Can't log a set for a future day",
+  'dayAdd.noRoutines': 'You have no routines yet. Create one on the Routines tab first.',
+  'dayAdd.alreadyScheduled': 'Already on this day',
+  'dayAdd.confirmBody': 'Add "{routine}" to every {day}? It will show on your calendar each week.',
+  'dayAdd.confirmYes': 'Yes, add it',
+  'dayAdd.back': 'Back',
+  'dayAdd.weight': 'Weight (kg)',
+  'dayAdd.reps': 'Reps',
+  'dayAdd.errGeneric': 'Something went wrong. Try again.',
+
+  'routineDetail.schedule': 'Weekly plan',
+  'routineDetail.scheduleHint': 'Pick the days you train this routine — they show up on your calendar every week.',
+  'routineDetail.scheduleActive': 'Every {days}',
+  'routineDetail.exercises': 'Exercises',
+  'routineDetail.totalReps': '{reps} total reps',
+  'routineDetail.empty': 'No exercises yet. Add your first one below.',
+  'routineDetail.addExercise': 'Add exercise',
+  'routineDetail.start': 'Start workout',
 
   // add routine exercise modal
   'addRoutineEx.title': 'Add exercise',
   'addRoutineEx.targetSets': 'Target sets',
   'addRoutineEx.targetReps': 'Target reps',
+  'addRoutineEx.pickFirst': 'Pick an exercise to set its targets.',
 
   // calendar
   'calendar.past': 'History',
@@ -217,6 +261,7 @@ export const en: Dict = {
   'picker.noMatch': 'No matching exercise found.',
   'picker.addCustom': 'Add custom exercise',
   'picker.results': '{count} results',
+  'picker.all': 'All',
 
   // exercise history modal
   'history.noHistory': 'No history yet for this exercise.',
@@ -319,6 +364,7 @@ export const tr: Dict = {
   'auth.resendConfirmation': 'Onay e-postasını tekrar gönder',
   'auth.resendSent': 'Onay e-postası tekrar gönderildi',
   'auth.confirmTitle': 'E-postanı onayla',
+  'auth.confirmKicker': 'Son bir adım',
   'auth.confirmBody':
     '{email} adresine bir onay linki gönderdik. Hesabını kullanabilmek için gelen kutundaki linke tıkla, sonra buradan giriş yap.',
   'auth.confirmResent': 'Onay e-postası tekrar gönderildi.',
@@ -386,13 +432,56 @@ export const tr: Dict = {
   'routines.empty':
     'Henüz bir rutinin yok. Sağ üstteki + ile bir tane oluştur — egzersizlerini ve hedef set/tekrar sayılarını önceden planla, antrenman gününde tek dokunuşla başlat.',
   'routines.exerciseCount': '{count} egzersiz',
+  'routines.setCount': '{count} set',
   'routines.addExercise': '+ Egzersiz ekle',
   'routines.start': 'Başlat',
   'routines.errCreate': 'Rutin oluşturulamadı.',
 
+  // routine detail
+  'routineDetail.label': 'Rutin',
+  'routineDetail.back': 'Geri dön',
+  'routineDetail.notFound': 'Bu rutin artık mevcut değil.',
+  'routineDetail.duration': 'Süre',
+  'routineDetail.sets': 'Set',
+  'routineDetail.exercisesStat': 'Hareket',
+  'routineDetail.minutesShort': 'dk',
+  // calendar day planning
+  'calendar.planned': 'Planlanan',
+  'calendar.logged': 'Yapılan',
+  'calendar.legendPlanned': 'Planlı',
+  'calendar.legendDone': 'Yapıldı',
+  'calendar.addToDay': 'Bu güne ekle',
+  'calendar.emptyFuture': 'Bu gün için henüz bir plan yok.',
+
+  // day add sheet
+  'dayAdd.kicker': 'Şu güne ekle',
+  'dayAdd.routineTitle': 'Rutin programla',
+  'dayAdd.routineBody': 'Her {day} tekrarlanır',
+  'dayAdd.exerciseTitle': 'Egzersiz kaydet',
+  'dayAdd.exerciseBody': 'Bu güne bir set işle',
+  'dayAdd.exerciseFuture': 'Gelecek bir güne set kaydedilemez',
+  'dayAdd.noRoutines': 'Henüz rutinin yok. Önce Rutinler sekmesinden bir tane oluştur.',
+  'dayAdd.alreadyScheduled': 'Bu güne zaten ekli',
+  'dayAdd.confirmBody': '"{routine}" her {day} gününe eklensin mi? Takvimde her hafta görünecek.',
+  'dayAdd.confirmYes': 'Evet, ekle',
+  'dayAdd.back': 'Geri',
+  'dayAdd.weight': 'Ağırlık (kg)',
+  'dayAdd.reps': 'Tekrar',
+  'dayAdd.errGeneric': 'Bir şeyler ters gitti. Tekrar dene.',
+
+  'routineDetail.schedule': 'Haftalık program',
+  'routineDetail.scheduleHint': 'Bu rutini hangi günler yaptığını seç — takvimde her hafta görünsün.',
+  'routineDetail.scheduleActive': 'Her {days}',
+  'routineDetail.exercises': 'Egzersizler',
+  'routineDetail.totalReps': 'toplam {reps} tekrar',
+  'routineDetail.empty': 'Henüz egzersiz yok. Aşağıdan ilkini ekle.',
+  'routineDetail.addExercise': 'Egzersiz ekle',
+  'routineDetail.start': 'Antrenmanı başlat',
+
   'addRoutineEx.title': 'Egzersiz ekle',
   'addRoutineEx.targetSets': 'Hedef set',
   'addRoutineEx.targetReps': 'Hedef tekrar',
+  'addRoutineEx.pickFirst': 'Hedefleri belirlemek için bir egzersiz seç.',
 
   'calendar.past': 'Geçmiş',
   'calendar.title': 'Takvim',
@@ -460,6 +549,7 @@ export const tr: Dict = {
   'picker.noMatch': 'Eşleşen egzersiz bulunamadı.',
   'picker.addCustom': 'Özel egzersiz ekle',
   'picker.results': '{count} sonuç',
+  'picker.all': 'Tümü',
 
   'history.noHistory': 'Bu egzersiz için henüz geçmiş yok.',
   'history.est1rm': 'Tahmini 1RM',

@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, KeyboardAvoidingView, Platform } from 'react-native';
+import { Animated, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   Box,
   VStack,
@@ -16,15 +18,103 @@ import {
 } from '@gluestack-ui/themed';
 import { Ionicons } from '@expo/vector-icons';
 import Icon from '@/components/Icon';
+import HeroSlashes from '@/components/HeroSlashes';
 import { useAuth } from '@/contexts/AuthContext';
 import { useI18n } from '@/i18n';
-import AnimatedBackground from '@/components/AnimatedBackground';
 import { colors, cardShadow } from '@/theme';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_NOT_CONFIRMED = 'Email not confirmed';
 
+const HERO_HEIGHT = 230;
+/** shadcn's login block caps its column at max-w-sm; same idea here so the
+ *  form stays a readable column on tablets and the web build instead of
+ *  stretching edge to edge. */
+const COLUMN_MAX_WIDTH = 440;
+/** The form panel rides up over the hero's bottom edge, same seam trick as
+ *  the routine detail screen, so the two blocks lock together. */
+const PANEL_OVERLAP = 20;
+
 type Mode = 'signIn' | 'signUp' | 'forgotPassword';
+
+/** Crimson hero shared by the auth screen's two states. */
+function AuthHero({ icon, title, subtitle }: { icon: 'barbell' | 'mail-unread-outline'; title: string; subtitle: string }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <Box h={HERO_HEIGHT}>
+      <LinearGradient
+        colors={['#A31621', '#500A10', colors.bg]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: HERO_HEIGHT }}
+      />
+      <HeroSlashes height={HERO_HEIGHT} />
+
+      <VStack
+        flex={1}
+        px="$5"
+        pt={insets.top + 12}
+        pb={PANEL_OVERLAP + 22}
+        justifyContent="flex-end"
+        space="xs"
+        w="100%"
+        maxWidth={COLUMN_MAX_WIDTH}
+        alignSelf="center"
+      >
+        <Box
+          w={46}
+          h={46}
+          borderRadius="$xl"
+          bg="rgba(10, 9, 8, 0.5)"
+          borderWidth={1}
+          borderColor={colors.accent}
+          alignItems="center"
+          justifyContent="center"
+          mb="$1"
+        >
+          <Icon name={icon} size={24} color={colors.accent} />
+        </Box>
+
+        {/* Wide tracking is what makes the wordmark read as a lockup rather
+            than just a large heading. */}
+        <Heading color="$textDark0" fontSize={40} lineHeight={42} letterSpacing={4}>
+          {title}
+        </Heading>
+        <HStack alignItems="center" space="xs">
+          <Box w={16} h={2} bg={colors.accent} />
+          <Text color={colors.accentSoft} fontSize={11} fontWeight="$bold" letterSpacing={1.2} textTransform="uppercase" flex={1}>
+            {subtitle}
+          </Text>
+        </HStack>
+      </VStack>
+    </Box>
+  );
+}
+
+function SegmentTab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      flex={1}
+      onPress={onPress}
+      bg={active ? colors.primary : 'transparent'}
+      borderBottomWidth={2}
+      borderBottomColor={active ? colors.accent : 'transparent'}
+      py="$3"
+      alignItems="center"
+      justifyContent="center"
+    >
+      <Text
+        color={active ? '$textDark0' : colors.textMuted}
+        fontSize={13}
+        fontWeight="$black"
+        letterSpacing={1.2}
+        textTransform="uppercase"
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
 
 export default function AuthScreen() {
   const { t } = useI18n();
@@ -139,107 +229,76 @@ export default function AuthScreen() {
 
   if (pendingConfirmationEmail) {
     return (
-      <Box flex={1} bg="$backgroundDark950">
-        <AnimatedBackground />
+      <Box flex={1} bg={colors.bg}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <VStack flex={1} justifyContent="center" px="$6" space="xl">
-            <VStack alignItems="center" space="sm">
-              <Box
-                w={56}
-                h={56}
-                borderRadius="$xl"
-                bg="$backgroundDark900"
-                borderWidth={1}
-                borderColor="$borderDark800"
-                alignItems="center"
-                justifyContent="center"
-              >
-                <Icon name="mail-unread-outline" size={28} color={colors.accent} />
-              </Box>
-              <Heading color="$textDark0" size="2xl" textAlign="center">
-                {t('auth.confirmTitle')}
-              </Heading>
-              <Text color="$textDark500" size="sm" textAlign="center">
-                {t('auth.confirmBody', { email: pendingConfirmationEmail })}
-              </Text>
-            </VStack>
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+            <AuthHero icon="mail-unread-outline" title={t('auth.confirmTitle')} subtitle={t('auth.confirmKicker')} />
 
-            <Box bg="$backgroundDark900" borderRadius="$2xl" borderWidth={1} borderColor="$borderDark800" p="$5" {...cardShadow}>
-              <VStack space="md">
-                {resendSent && (
-                  <Text color="$success400" size="sm" textAlign="center">
-                    {t('auth.confirmResent')}
+            <Box px="$5" mt={-PANEL_OVERLAP} w="100%" maxWidth={COLUMN_MAX_WIDTH} alignSelf="center">
+              <Box bg={colors.surface} borderRadius="$2xl" borderWidth={1} borderColor={colors.border} p="$5" {...cardShadow}>
+                <VStack space="md">
+                  <Text color={colors.textSecondary} size="sm">
+                    {t('auth.confirmBody', { email: pendingConfirmationEmail })}
                   </Text>
-                )}
-                {error && (
-                  <Text color="$error400" size="sm" textAlign="center">
-                    {error}
-                  </Text>
-                )}
-                <Button
-                  size="lg"
-                  borderRadius="$lg"
-                  variant="outline"
-                  borderColor="$borderDark700"
-                  bg="$backgroundDark800"
-                  onPress={() => handleResendConfirmation(pendingConfirmationEmail)}
-                  isDisabled={loading}
-                >
-                  <ButtonText color="$textDark0">{loading ? '...' : t('auth.resendConfirmation')}</ButtonText>
-                </Button>
-                <Button
-                  size="lg"
-                  borderRadius="$lg"
-                  bg="$primary500"
-                  onPress={() => {
-                    setPendingConfirmationEmail(null);
-                    switchMode('signIn');
-                  }}
-                >
-                  <ButtonText>{t('auth.backToSignIn')}</ButtonText>
-                </Button>
-              </VStack>
+                  {resendSent && (
+                    <Text color="$success400" size="sm" textAlign="center">
+                      {t('auth.confirmResent')}
+                    </Text>
+                  )}
+                  {error && (
+                    <Text color={colors.danger} size="sm" textAlign="center">
+                      {error}
+                    </Text>
+                  )}
+                  <Button
+                    size="lg"
+                    borderRadius="$xl"
+                    variant="outline"
+                    borderColor={colors.border}
+                    bg={colors.surfaceAlt}
+                    onPress={() => handleResendConfirmation(pendingConfirmationEmail)}
+                    isDisabled={loading}
+                  >
+                    <ButtonText color="$textDark0">{loading ? '...' : t('auth.resendConfirmation')}</ButtonText>
+                  </Button>
+                  <Button
+                    size="lg"
+                    borderRadius="$xl"
+                    bg="$primary500"
+                    onPress={() => {
+                      setPendingConfirmationEmail(null);
+                      switchMode('signIn');
+                    }}
+                  >
+                    <ButtonText fontWeight="$black" letterSpacing={1} textTransform="uppercase">
+                      {t('auth.backToSignIn')}
+                    </ButtonText>
+                  </Button>
+                </VStack>
+              </Box>
             </Box>
-          </VStack>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Box>
     );
   }
 
+  const heroSubtitle =
+    mode === 'forgotPassword'
+      ? t('auth.resetSubtitle')
+      : mode === 'signIn'
+        ? t('auth.signInSubtitle')
+        : t('auth.signUpSubtitle');
+
   return (
-    <Box flex={1} bg="$backgroundDark950">
-      <AnimatedBackground />
+    <Box flex={1} bg={colors.bg}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <VStack flex={1} justifyContent="center" px="$6" space="xl">
-          <VStack alignItems="center" space="sm">
-            <Box
-              w={56}
-              h={56}
-              borderRadius="$xl"
-              bg="$backgroundDark900"
-              borderWidth={1}
-              borderColor="$borderDark800"
-              alignItems="center"
-              justifyContent="center"
-            >
-              <Icon name="barbell" size={28} color={colors.accent} />
-            </Box>
-            <Heading color="$textDark0" size="2xl">
-              Setwise
-            </Heading>
-            <Text color="$textDark500" size="sm" textAlign="center">
-              {mode === 'forgotPassword'
-                ? t('auth.resetSubtitle')
-                : mode === 'signIn'
-                  ? t('auth.signInSubtitle')
-                  : t('auth.signUpSubtitle')}
-            </Text>
-            {mode !== 'forgotPassword' && (
-              <Text color="$textDark600" size="xs" textAlign="center">
-                {t('auth.tagline')}
-              </Text>
-            )}
-          </VStack>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <AuthHero icon="barbell" title="SETWISE" subtitle={heroSubtitle} />
 
           <Animated.View
             style={{
@@ -247,198 +306,226 @@ export default function AuthScreen() {
               transform: [{ translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
             }}
           >
-            <Box
-              bg="$backgroundDark900"
-              borderRadius="$2xl"
-              borderWidth={1}
-              borderColor="$borderDark800"
-              p="$5"
-              {...cardShadow}
-            >
-              <VStack space="md">
-                {mode === 'signUp' && (
-                  <HStack space="sm">
-                    <Input
-                      flex={1}
-                      variant="outline"
-                      size="lg"
-                      borderColor="$borderDark700"
-                      borderRadius="$lg"
-                      bg="$backgroundDark800"
-                    >
-                      <InputSlot pl="$3">
-                        <Icon name="person-outline" size={18} color={colors.textMuted} />
-                      </InputSlot>
-                      <InputField
-                        placeholder={t('auth.firstName')}
-                        placeholderTextColor={colors.textMuted}
-                        color="$textDark0"
-                        value={firstName}
-                        onChangeText={setFirstName}
-                      />
-                    </Input>
-                    <Input
-                      flex={1}
-                      variant="outline"
-                      size="lg"
-                      borderColor="$borderDark700"
-                      borderRadius="$lg"
-                      bg="$backgroundDark800"
-                    >
-                      <InputField
-                        placeholder={t('auth.lastName')}
-                        placeholderTextColor={colors.textMuted}
-                        color="$textDark0"
-                        value={lastName}
-                        onChangeText={setLastName}
-                      />
-                    </Input>
+            <Box px="$5" mt={-PANEL_OVERLAP} w="100%" maxWidth={COLUMN_MAX_WIDTH} alignSelf="center">
+              <Box
+                bg={colors.surface}
+                borderRadius="$2xl"
+                borderWidth={1}
+                borderColor={colors.border}
+                overflow="hidden"
+                {...cardShadow}
+              >
+                {/* Reset is a detour off the two main modes, so it drops the
+                    tabs entirely rather than showing a third one. */}
+                {mode !== 'forgotPassword' && (
+                  <HStack borderBottomWidth={1} borderBottomColor={colors.border}>
+                    <SegmentTab
+                      label={t('auth.signIn')}
+                      active={mode === 'signIn'}
+                      onPress={() => switchMode('signIn')}
+                    />
+                    <SegmentTab
+                      label={t('auth.signUp')}
+                      active={mode === 'signUp'}
+                      onPress={() => switchMode('signUp')}
+                    />
                   </HStack>
                 )}
 
-                <Input variant="outline" size="lg" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
-                  <InputSlot pl="$3">
-                    <Icon name="mail-outline" size={18} color={colors.textMuted} />
-                  </InputSlot>
-                  <InputField
-                    placeholder={t('auth.email')}
-                    placeholderTextColor={colors.textMuted}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                    color="$textDark0"
-                    value={email}
-                    onChangeText={setEmail}
-                  />
-                </Input>
-
-                {mode !== 'forgotPassword' && (
-                  <Input variant="outline" size="lg" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
-                    <InputSlot pl="$3">
-                      <Icon name="lock-closed-outline" size={18} color={colors.textMuted} />
-                    </InputSlot>
-                    <InputField
-                      placeholder={t('auth.password')}
-                      placeholderTextColor={colors.textMuted}
-                      secureTextEntry={!showPassword}
-                      autoCapitalize="none"
-                      color="$textDark0"
-                      value={password}
-                      onChangeText={setPassword}
-                    />
-                    <InputSlot pr="$3">
-                      <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={8}>
-                        <Icon name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.textMuted} />
-                      </Pressable>
-                    </InputSlot>
-                  </Input>
-                )}
-
-                {mode === 'signUp' && (
-                  <Input variant="outline" size="lg" borderColor="$borderDark700" borderRadius="$lg" bg="$backgroundDark800">
-                    <InputSlot pl="$3">
-                      <Icon name="lock-closed-outline" size={18} color={colors.textMuted} />
-                    </InputSlot>
-                    <InputField
-                      placeholder={t('auth.passwordConfirm')}
-                      placeholderTextColor={colors.textMuted}
-                      secureTextEntry={!showConfirmPassword}
-                      autoCapitalize="none"
-                      color="$textDark0"
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                    />
-                    <InputSlot pr="$3">
-                      <Pressable onPress={() => setShowConfirmPassword((v) => !v)} hitSlop={8}>
-                        <Icon
-                          name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
-                          size={18}
-                          color={colors.textMuted}
-                        />
-                      </Pressable>
-                    </InputSlot>
-                  </Input>
-                )}
-
-                {mode === 'signIn' && (
-                  <Pressable onPress={() => switchMode('forgotPassword')} alignSelf="flex-end">
-                    <Text color={colors.accent} size="xs" fontWeight="$semibold">
-                      {t('auth.forgotPassword')}
-                    </Text>
-                  </Pressable>
-                )}
-
-                {resetSent && mode === 'forgotPassword' && (
-                  <Text color="$success400" size="sm" textAlign="center">
-                    {t('auth.resetSent')}
-                  </Text>
-                )}
-
-                {error && (
-                  <Text color="$error400" size="sm" textAlign="center">
-                    {error}
-                  </Text>
-                )}
-
-                {unconfirmedEmail && (
-                  <Pressable onPress={() => handleResendConfirmation(unconfirmedEmail)}>
-                    <Text color={colors.accent} size="xs" fontWeight="$semibold" textAlign="center">
-                      {resendSent ? t('auth.resendSent') : t('auth.resendConfirmation')}
-                    </Text>
-                  </Pressable>
-                )}
-
-                {mode === 'forgotPassword' ? (
-                  <Button size="lg" borderRadius="$lg" bg="$primary500" onPress={handleResetPassword} isDisabled={loading}>
-                    <ButtonText>{loading ? '...' : t('auth.sendResetLink')}</ButtonText>
-                  </Button>
-                ) : (
-                  <>
-                    <Button size="lg" borderRadius="$lg" bg="$primary500" onPress={handleSubmit} isDisabled={loading}>
-                      <ButtonText>{loading ? '...' : mode === 'signIn' ? t('auth.signIn') : t('auth.signUp')}</ButtonText>
-                    </Button>
-
-                    <HStack alignItems="center" space="sm">
-                      <Divider bg="$borderDark800" flex={1} />
-                      <Text color="$textDark500" size="xs">
-                        {t('auth.or')}
+                <VStack space="md" p="$5">
+                  {mode === 'forgotPassword' && (
+                    <Pressable onPress={() => switchMode('signIn')} flexDirection="row" alignItems="center" mb="$1">
+                      <Icon name="chevron-back" size={16} color={colors.accent} />
+                      <Text color={colors.accent} size="xs" fontWeight="$bold" ml="$1">
+                        {t('auth.backToSignIn')}
                       </Text>
-                      <Divider bg="$borderDark800" flex={1} />
-                    </HStack>
+                    </Pressable>
+                  )}
 
-                    <Button
-                      size="lg"
+                  {mode === 'signUp' && (
+                    <HStack space="sm">
+                      <Input flex={1} variant="outline" size="lg" borderColor={colors.border} borderRadius="$xl" bg={colors.surfaceAlt}>
+                        <InputSlot pl="$3">
+                          <Icon name="person-outline" size={18} color={colors.textMuted} />
+                        </InputSlot>
+                        <InputField
+                          placeholder={t('auth.firstName')}
+                          placeholderTextColor={colors.textMuted}
+                          color="$textDark0"
+                          value={firstName}
+                          onChangeText={setFirstName}
+                        />
+                      </Input>
+                      <Input flex={1} variant="outline" size="lg" borderColor={colors.border} borderRadius="$xl" bg={colors.surfaceAlt}>
+                        <InputField
+                          placeholder={t('auth.lastName')}
+                          placeholderTextColor={colors.textMuted}
+                          color="$textDark0"
+                          value={lastName}
+                          onChangeText={setLastName}
+                        />
+                      </Input>
+                    </HStack>
+                  )}
+
+                  <Input variant="outline" size="lg" borderColor={colors.border} borderRadius="$xl" bg={colors.surfaceAlt}>
+                    <InputSlot pl="$3">
+                      <Icon name="mail-outline" size={18} color={colors.textMuted} />
+                    </InputSlot>
+                    <InputField
+                      placeholder={t('auth.email')}
+                      placeholderTextColor={colors.textMuted}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      color="$textDark0"
+                      value={email}
+                      onChangeText={setEmail}
+                    />
+                  </Input>
+
+                  {mode !== 'forgotPassword' && (
+                    <Input variant="outline" size="lg" borderColor={colors.border} borderRadius="$xl" bg={colors.surfaceAlt}>
+                      <InputSlot pl="$3">
+                        <Icon name="lock-closed-outline" size={18} color={colors.textMuted} />
+                      </InputSlot>
+                      <InputField
+                        placeholder={t('auth.password')}
+                        placeholderTextColor={colors.textMuted}
+                        secureTextEntry={!showPassword}
+                        autoCapitalize="none"
+                        color="$textDark0"
+                        value={password}
+                        onChangeText={setPassword}
+                      />
+                      <InputSlot pr="$3">
+                        <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={8}>
+                          <Icon name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.textMuted} />
+                        </Pressable>
+                      </InputSlot>
+                    </Input>
+                  )}
+
+                  {mode === 'signUp' && (
+                    <Input variant="outline" size="lg" borderColor={colors.border} borderRadius="$xl" bg={colors.surfaceAlt}>
+                      <InputSlot pl="$3">
+                        <Icon name="lock-closed-outline" size={18} color={colors.textMuted} />
+                      </InputSlot>
+                      <InputField
+                        placeholder={t('auth.passwordConfirm')}
+                        placeholderTextColor={colors.textMuted}
+                        secureTextEntry={!showConfirmPassword}
+                        autoCapitalize="none"
+                        color="$textDark0"
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                      />
+                      <InputSlot pr="$3">
+                        <Pressable onPress={() => setShowConfirmPassword((v) => !v)} hitSlop={8}>
+                          <Icon
+                            name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
+                            size={18}
+                            color={colors.textMuted}
+                          />
+                        </Pressable>
+                      </InputSlot>
+                    </Input>
+                  )}
+
+                  {mode === 'signIn' && (
+                    <Pressable onPress={() => switchMode('forgotPassword')} alignSelf="flex-end">
+                      <Text color={colors.accent} size="xs" fontWeight="$semibold">
+                        {t('auth.forgotPassword')}
+                      </Text>
+                    </Pressable>
+                  )}
+
+                  {resetSent && mode === 'forgotPassword' && (
+                    <Text color="$success400" size="sm" textAlign="center">
+                      {t('auth.resetSent')}
+                    </Text>
+                  )}
+
+                  {error && (
+                    <HStack
+                      alignItems="center"
+                      space="xs"
+                      bg="rgba(255, 107, 53, 0.08)"
+                      borderWidth={1}
+                      borderLeftWidth={3}
+                      borderColor="rgba(255, 107, 53, 0.3)"
+                      borderLeftColor={colors.danger}
                       borderRadius="$lg"
-                      variant="outline"
-                      borderColor="$borderDark700"
-                      bg="$backgroundDark800"
-                      onPress={handleGoogleSignIn}
-                      isDisabled={googleLoading}
+                      px="$3"
+                      py="$2"
                     >
-                      <HStack alignItems="center" space="sm">
-                        <Ionicons name="logo-google" size={18} color={colors.textPrimary} />
-                        <ButtonText color="$textDark0">
-                          {googleLoading ? '...' : t('auth.continueWithGoogle')}
-                        </ButtonText>
-                      </HStack>
+                      <Icon name="alert-circle" size={15} color={colors.danger} />
+                      <Text color={colors.danger} size="xs" flex={1}>
+                        {error}
+                      </Text>
+                    </HStack>
+                  )}
+
+                  {unconfirmedEmail && (
+                    <Pressable onPress={() => handleResendConfirmation(unconfirmedEmail)}>
+                      <Text color={colors.accent} size="xs" fontWeight="$semibold" textAlign="center">
+                        {resendSent ? t('auth.resendSent') : t('auth.resendConfirmation')}
+                      </Text>
+                    </Pressable>
+                  )}
+
+                  {mode === 'forgotPassword' ? (
+                    <Button size="lg" h={52} borderRadius="$xl" bg="$primary500" onPress={handleResetPassword} isDisabled={loading}>
+                      <ButtonText fontWeight="$black" letterSpacing={1.2} textTransform="uppercase">
+                        {loading ? '...' : t('auth.sendResetLink')}
+                      </ButtonText>
                     </Button>
-                  </>
-                )}
-              </VStack>
+                  ) : (
+                    <>
+                      <Button size="lg" h={52} borderRadius="$xl" bg="$primary500" onPress={handleSubmit} isDisabled={loading}>
+                        <HStack alignItems="center" space="sm">
+                          {!loading && <Icon name="flame" size={17} color="#FFFFFF" />}
+                          <ButtonText fontWeight="$black" letterSpacing={1.2} textTransform="uppercase">
+                            {loading ? '...' : mode === 'signIn' ? t('auth.signIn') : t('auth.signUp')}
+                          </ButtonText>
+                        </HStack>
+                      </Button>
+
+                      <HStack alignItems="center" space="sm">
+                        <Divider bg={colors.border} flex={1} />
+                        <Text color={colors.textMuted} size="xs" textTransform="uppercase" letterSpacing={1}>
+                          {t('auth.or')}
+                        </Text>
+                        <Divider bg={colors.border} flex={1} />
+                      </HStack>
+
+                      <Button
+                        size="lg"
+                        h={52}
+                        borderRadius="$xl"
+                        variant="outline"
+                        borderColor={colors.border}
+                        bg={colors.surfaceAlt}
+                        onPress={handleGoogleSignIn}
+                        isDisabled={googleLoading}
+                      >
+                        <HStack alignItems="center" space="sm">
+                          <Ionicons name="logo-google" size={18} color={colors.textPrimary} />
+                          <ButtonText color="$textDark0" fontWeight="$semibold">
+                            {googleLoading ? '...' : t('auth.continueWithGoogle')}
+                          </ButtonText>
+                        </HStack>
+                      </Button>
+                    </>
+                  )}
+                </VStack>
+              </Box>
             </Box>
           </Animated.View>
 
-          <Pressable
-            onPress={() => (mode === 'forgotPassword' ? switchMode('signIn') : switchMode(mode === 'signIn' ? 'signUp' : 'signIn'))}
-          >
-            <Text color="$textDark400" textAlign="center" size="sm">
-              {mode === 'forgotPassword'
-                ? t('auth.backToSignIn')
-                : mode === 'signIn'
-                  ? t('auth.noAccount')
-                  : t('auth.haveAccount')}
-            </Text>
-          </Pressable>
-        </VStack>
+          <Text color={colors.textMuted} size="xs" textAlign="center" px="$8" mt="$5">
+            {t('auth.tagline')}
+          </Text>
+        </ScrollView>
       </KeyboardAvoidingView>
     </Box>
   );

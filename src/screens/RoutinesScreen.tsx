@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { FlatList } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Box,
   VStack,
@@ -18,26 +19,31 @@ import {
 import Icon from '@/components/Icon';
 import { useRoutines } from '@/hooks/useRoutines';
 import { useExercises } from '@/hooks/useExercises';
-import { useActiveRoutine } from '@/contexts/ActiveRoutineContext';
 import { useI18n } from '@/i18n';
-import AddRoutineExerciseModal from '@/components/AddRoutineExerciseModal';
 import AnimatedBackground from '@/components/AnimatedBackground';
-import { Routine } from '@/types';
+import { computeRoutineStats } from '@/services/routineStats';
+import { RoutinesStackParamList } from '@/navigation/types';
+import { MUSCLE_ICONS } from '@/constants/muscleGroups';
 import { colors, cardShadow } from '@/theme';
 
 export default function RoutinesScreen() {
   const { t } = useI18n();
-  const { routines, loading, createRoutine, deleteRoutine, addExerciseToRoutine, removeExerciseFromRoutine } =
-    useRoutines();
+  const { routines, loading, reload, createRoutine } = useRoutines();
   const { exercises } = useExercises();
-  const { startRoutine } = useActiveRoutine();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RoutinesStackParamList>>();
 
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState('');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [modalRoutineId, setModalRoutineId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // The detail screen owns its own useRoutines copy, so edits made there
+  // (adding exercises, deleting a routine) are invisible to this list until
+  // it refetches. Reloading on focus is what keeps the two in step.
+  useFocusEffect(
+    useCallback(() => {
+      reload();
+    }, [reload])
+  );
 
   async function handleCreate() {
     if (!newTitle.trim()) return;
@@ -45,15 +51,10 @@ export default function RoutinesScreen() {
       const routine = await createRoutine(newTitle.trim());
       setNewTitle('');
       setCreating(false);
-      setExpandedId(routine.id);
+      navigation.navigate('RoutineDetail', { routineId: routine.id });
     } catch (err) {
       setError(err instanceof Error ? err.message : t('routines.errCreate'));
     }
-  }
-
-  function handleStart(routine: Routine) {
-    startRoutine(routine);
-    navigation.navigate('Antrenman' as never);
   }
 
   if (loading) {
@@ -119,7 +120,7 @@ export default function RoutinesScreen() {
         )}
 
         {routines.length === 0 && !creating && (
-          <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$xl" p="$4">
+          <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$2xl" p="$4">
             <Text color="$textDark400" size="sm">
               {t('routines.empty')}
             </Text>
@@ -131,92 +132,66 @@ export default function RoutinesScreen() {
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
-            const expanded = expandedId === item.id;
+            const stats = computeRoutineStats(item, exercises);
             return (
-              <Box bg="$backgroundDark900" borderWidth={1} borderColor="$borderDark800" borderRadius="$xl" p="$3" mb="$3" {...cardShadow}>
-                <Pressable
-                  onPress={() => setExpandedId(expanded ? null : item.id)}
-                  flexDirection="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                >
-                  <VStack>
-                    <Text color="$textDark0" fontWeight="$bold" size="md">
-                      {item.title}
+              <Pressable
+                onPress={() => navigation.navigate('RoutineDetail', { routineId: item.id })}
+                bg="$backgroundDark900"
+                borderWidth={1}
+                borderLeftWidth={3}
+                borderColor="$borderDark800"
+                borderLeftColor={colors.primary}
+                borderRadius="$2xl"
+                px="$3"
+                py="$3"
+                mb="$3"
+                flexDirection="row"
+                alignItems="center"
+                {...cardShadow}
+              >
+                <VStack flex={1} space="xs">
+                  <Text color="$textDark0" fontWeight="$bold" size="md" numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <HStack alignItems="center" space="sm">
+                    <Text color={colors.textMuted} fontSize={11} fontFamily="$mono">
+                      {t('routines.exerciseCount', { count: stats.exerciseCount })}
                     </Text>
-                    <Text color="$textDark500" size="xs">
-                      {t('routines.exerciseCount', { count: item.exercises.length })}
-                    </Text>
-                  </VStack>
-                  <HStack space="md" alignItems="center">
-                    <Pressable onPress={() => deleteRoutine(item.id)} hitSlop={8}>
-                      <Icon name="trash-outline" size={18} color={colors.textMuted} />
-                    </Pressable>
-                    <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
+                    {stats.totalSets > 0 && (
+                      <>
+                        <Box w={3} h={3} borderRadius="$full" bg={colors.border} />
+                        <Text color={colors.textMuted} fontSize={11} fontFamily="$mono">
+                          {t('routines.setCount', { count: stats.totalSets })}
+                        </Text>
+                        <Box w={3} h={3} borderRadius="$full" bg={colors.border} />
+                        <Text color={colors.textMuted} fontSize={11} fontFamily="$mono">
+                          ~{stats.estimatedMinutes}
+                          {t('routineDetail.minutesShort')}
+                        </Text>
+                      </>
+                    )}
                   </HStack>
-                </Pressable>
-
-                {expanded && (
-                  <VStack mt="$3" space="xs">
-                    {item.exercises.map((ex) => (
-                      <HStack
-                        key={ex.id}
-                        alignItems="center"
-                        justifyContent="space-between"
-                        bg="$backgroundDark800"
-                        borderRadius="$lg"
-                        px="$3"
-                        py="$2"
-                      >
-                        <Text color="$textDark0" size="sm" flex={1}>
-                          {ex.name}
-                        </Text>
-                        <Text color="$textDark500" size="xs" mr="$2" fontFamily="$mono">
-                          {ex.targetSets} × {ex.targetReps}
-                        </Text>
-                        <Pressable onPress={() => removeExerciseFromRoutine(item.id, ex.id)} hitSlop={8}>
-                          <Icon name="close" size={16} color={colors.textMuted} />
-                        </Pressable>
-                      </HStack>
-                    ))}
-
-                    <Pressable
-                      onPress={() => setModalRoutineId(item.id)}
-                      borderWidth={1}
-                      borderColor={colors.accent}
-                      borderStyle="dashed"
-                      borderRadius="$lg"
-                      py="$2"
-                      alignItems="center"
-                      mt="$1"
-                    >
-                      <Text color={colors.accent} size="xs" fontWeight="$bold">
-                        {t('routines.addExercise')}
-                      </Text>
-                    </Pressable>
-
-                    <Button
-                      borderRadius="$lg"
-                      bg="$primary500"
-                      mt="$2"
-                      onPress={() => handleStart(item)}
-                      isDisabled={item.exercises.length === 0}
-                    >
-                      <ButtonText>{t('routines.start')}</ButtonText>
-                    </Button>
-                  </VStack>
-                )}
-              </Box>
+                  {stats.muscles.length > 0 && (
+                    <HStack space="xs" mt="$1">
+                      {stats.muscles.slice(0, 5).map((muscle) => (
+                        <Box
+                          key={muscle}
+                          w={22}
+                          h={22}
+                          borderRadius="$md"
+                          bg="$backgroundDark800"
+                          alignItems="center"
+                          justifyContent="center"
+                        >
+                          <Icon name={MUSCLE_ICONS[muscle]} size={12} color={colors.accentSoft} />
+                        </Box>
+                      ))}
+                    </HStack>
+                  )}
+                </VStack>
+                <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+              </Pressable>
             );
-          }}
-        />
-
-        <AddRoutineExerciseModal
-          visible={modalRoutineId != null}
-          onClose={() => setModalRoutineId(null)}
-          exercises={exercises}
-          onAdd={(exerciseId, name, targetSets, targetReps) => {
-            if (modalRoutineId) addExerciseToRoutine(modalRoutineId, exerciseId, name, targetSets, targetReps);
           }}
         />
       </Box>

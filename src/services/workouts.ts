@@ -65,6 +65,49 @@ function startOfTodayIso(): string {
   return d.toISOString();
 }
 
+/**
+ * Noon local rather than midnight: a day that gets rendered from its UTC
+ * timestamp can't slip into the neighbouring date under any timezone offset.
+ */
+function dateKeyToIso(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, m - 1, d, 12, 0, 0).toISOString();
+}
+
+/**
+ * Find-or-create the workout row for an arbitrary calendar day, so the
+ * calendar can back-fill a session the user forgot to log at the time.
+ * `created_at` is written explicitly, which is what puts the set in the right
+ * day for both the calendar grid and weekly volume totals.
+ */
+export async function getOrCreateWorkoutForDate(userId: string, dateKey: string): Promise<string> {
+  const dayStart = new Date(`${dateKey}T00:00:00`);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  const { data: existing, error: findError } = await supabase
+    .from('workouts')
+    .select('id')
+    .eq('user_id', userId)
+    .gte('created_at', dayStart.toISOString())
+    .lt('created_at', dayEnd.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (findError) throw findError;
+  if (existing) return existing.id;
+
+  const { data: created, error: createError } = await supabase
+    .from('workouts')
+    .insert({ user_id: userId, created_at: dateKeyToIso(dateKey) })
+    .select('id')
+    .single();
+
+  if (createError) throw createError;
+  return created.id;
+}
+
 async function getOrCreateTodayWorkout(userId: string): Promise<string> {
   const { data: existing, error: findError } = await supabase
     .from('workouts')
@@ -139,10 +182,14 @@ export async function logSet(params: {
   reps: number;
   setType?: SetType;
   rpe?: number;
+  /** 'YYYY-MM-DD' to back-fill a past day; omitted means today. */
+  dateKey?: string;
 }): Promise<SetEntry> {
-  const { userId, exerciseId, exerciseName, weightKg, reps, setType = 'normal', rpe } = params;
+  const { userId, exerciseId, exerciseName, weightKg, reps, setType = 'normal', rpe, dateKey } = params;
 
-  const workoutId = await getOrCreateTodayWorkout(userId);
+  const workoutId = dateKey
+    ? await getOrCreateWorkoutForDate(userId, dateKey)
+    : await getOrCreateTodayWorkout(userId);
   const workoutExerciseId = await getOrCreateWorkoutExercise(userId, workoutId, exerciseId, exerciseName);
 
   const { count } = await supabase
@@ -161,6 +208,9 @@ export async function logSet(params: {
       position: count ?? 0,
       set_type: setType,
       rpe: rpe ?? null,
+      // Back-filled sets must carry the target day too, or volume queries
+      // (which read sets.created_at, not the workout's) count them as today.
+      ...(dateKey ? { created_at: dateKeyToIso(dateKey) } : {}),
     })
     .select('id, created_at')
     .single();
