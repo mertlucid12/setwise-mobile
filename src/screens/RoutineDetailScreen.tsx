@@ -64,7 +64,7 @@ function StatCard({ icon, value, unit, label }: { icon: IconName; value: string;
     >
       <Icon name={icon} size={16} color={colors.accent} />
       <HStack alignItems="baseline" space="xs">
-        <Text color="$textDark0" fontSize={20} fontWeight="$black" fontFamily="$mono">
+        <Text color="$textDark0" fontSize={20} fontWeight="$extrabold" fontFamily="$mono">
           {value}
         </Text>
         {unit && (
@@ -98,7 +98,7 @@ export default function RoutineDetailScreen() {
 
   if (loading) {
     return (
-      <Box flex={1} bg={colors.bg} alignItems="center" justifyContent="center">
+      <Box flex={1} bg="transparent" alignItems="center" justifyContent="center">
         <Spinner color="$primary400" />
       </Box>
     );
@@ -106,7 +106,7 @@ export default function RoutineDetailScreen() {
 
   if (!routine) {
     return (
-      <Box flex={1} bg={colors.bg} alignItems="center" justifyContent="center" px="$6">
+      <Box flex={1} bg="transparent" alignItems="center" justifyContent="center" px="$6">
         <Text color={colors.textMuted} size="sm" mb="$4">
           {t('routineDetail.notFound')}
         </Text>
@@ -146,13 +146,13 @@ export default function RoutineDetailScreen() {
   }
 
   return (
-    <Box flex={1} bg={colors.bg}>
+    <Box flex={1} bg="transparent">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
         {/* Hero - deliberately full-bleed under the status bar so the crimson
             reaches the top edge of the device rather than sitting in a box. */}
         <Box h={HERO_HEIGHT}>
           <LinearGradient
-            colors={['#A31621', '#500A10', colors.bg]}
+            colors={['#E6211E', '#690003', colors.bg]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{ position: 'absolute', top: 0, left: 0, right: 0, height: HERO_HEIGHT }}
@@ -326,7 +326,7 @@ export default function RoutineDetailScreen() {
                     alignItems="center"
                     justifyContent="center"
                   >
-                    <Text color={colors.accent} fontSize={12} fontWeight="$black" fontFamily="$mono">
+                    <Text color={colors.accent} fontSize={12} fontWeight="$extrabold" fontFamily="$mono">
                       {index + 1}
                     </Text>
                   </Box>

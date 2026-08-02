@@ -56,7 +56,7 @@ function Segment({
         width,
         color: colors.textPrimary,
         fontSize: 15,
-        fontFamily: 'GeistMono_500Medium',
+        fontFamily: 'JetBrainsMono_500Medium',
         textAlign: 'center',
         paddingVertical: 0,
       }}

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, HStack, VStack, Text } from '@gluestack-ui/themed';
-import { colors } from '@/theme';
+import { colors, cardShadow } from '@/theme';
 
 /**
  * Split-flap board, the airport/stadium departure sign. It's a fixed grid of
@@ -25,12 +25,13 @@ const HOLD_TICKS = 55;
 const IDLE_FLIP_CHANCE = 0.06;
 
 /**
- * Lit tiles cycle through the brand's three hot colours instead of a single
- * gold, which is what stops a large board from reading as one flat block.
- * The colour comes from the cell's position, not from random, so a letter
- * doesn't change colour every time it riffles.
+ * Colour carries meaning rather than decoration, which is the whole warrior
+ * direction in miniature: a flap still spinning burns crimson, a flap that
+ * has locked onto its letter turns battle gold. So the board visibly resolves
+ * from red noise into a gold slogan instead of just cycling pretty colours.
  */
-const PALETTE = [colors.accentSoft, '#FF9D3D', colors.primaryLight];
+const SETTLED_COLOR = colors.accentSoft;
+const SPINNING_COLOR = colors.primaryLight;
 
 interface Props {
   /** Lines to cycle through. Newlines split a message across board rows. */
@@ -73,10 +74,13 @@ export default function TextFlippingBoard({ messages, rows = 4, cols = 9, tileSi
     [messages, messageIndex, rows, cols]
   );
   const [cells, setCells] = useState<string[]>(target);
+  /** How many cells have locked in, in reading order - drives tile colour. */
+  const [settledCount, setSettledCount] = useState(target.length);
   const tickRef = useRef(0);
 
   useEffect(() => {
     tickRef.current = 0;
+    setSettledCount(0);
 
     const id = setInterval(() => {
       tickRef.current += 1;
@@ -90,6 +94,7 @@ export default function TextFlippingBoard({ messages, rows = 4, cols = 9, tileSi
           setMessageIndex((i) => (i + 1) % messages.length);
           return;
         }
+        setSettledCount(target.length);
         setCells(
           target.map((char) =>
             char === ' ' && Math.random() < IDLE_FLIP_CHANCE ? randomGlyph() : char
@@ -97,6 +102,8 @@ export default function TextFlippingBoard({ messages, rows = 4, cols = 9, tileSi
         );
         return;
       }
+
+      setSettledCount(settled);
 
       setCells(
         target.map((char, i) => {
@@ -114,14 +121,28 @@ export default function TextFlippingBoard({ messages, rows = 4, cols = 9, tileSi
   }, [target, messages.length]);
 
   return (
-    <VStack space="xs" alignItems="center">
+    // Housing: the board is mounted on a plate with a crimson head rail and
+    // gold corner ticks, so it reads as hardware bolted to the wall rather
+    // than a floating grid of boxes.
+    <VStack
+      space="xs"
+      alignItems="center"
+      bg={colors.surface}
+      borderWidth={1}
+      borderColor={colors.border}
+      borderRadius="$2xl"
+      p={tileSize * 0.28}
+      {...cardShadow}
+    >
+      <Box w="100%" h={4} bg={colors.primary} borderRadius="$xs" mb={tileSize * 0.14} />
+
       {Array.from({ length: rows }, (_, row) => (
         <HStack key={row} space="xs">
           {Array.from({ length: cols }, (_, col) => {
             const index = row * cols + col;
             const char = cells[index] ?? ' ';
             const lit = char !== ' ';
-            const tint = PALETTE[(row + col) % PALETTE.length];
+            const tint = index < settledCount ? SETTLED_COLOR : SPINNING_COLOR;
             return (
               <Box
                 key={col}
@@ -158,6 +179,11 @@ export default function TextFlippingBoard({ messages, rows = 4, cols = 9, tileSi
           })}
         </HStack>
       ))}
+
+      <HStack w="100%" justifyContent="space-between" mt={tileSize * 0.14}>
+        <Box w={tileSize * 0.4} h={2} bg={colors.accent} />
+        <Box w={tileSize * 0.4} h={2} bg={colors.accent} />
+      </HStack>
     </VStack>
   );
 }

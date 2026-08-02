@@ -65,7 +65,7 @@ export default function RoutinesScreen() {
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1 }}>
-        <Box flex={1} bg="$backgroundDark950" alignItems="center" justifyContent="center">
+        <Box flex={1} bg="transparent" alignItems="center" justifyContent="center">
           <Spinner color="$primary400" />
         </Box>
       </SafeAreaView>
@@ -74,7 +74,7 @@ export default function RoutinesScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <Box flex={1} bg="$backgroundDark950" px="$4" pt="$4">
+      <Box flex={1} bg="transparent" px="$4" pt="$4">
         <AnimatedBackground />
         <HStack justifyContent="space-between" alignItems="flex-start" mb="$4">
           <VStack>

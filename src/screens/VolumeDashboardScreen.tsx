@@ -57,7 +57,7 @@ export default function VolumeDashboardScreen() {
   if (exercisesLoading || setsLoading) {
     return (
       <SafeAreaView style={{ flex: 1 }}>
-        <Box flex={1} bg="$backgroundDark950" alignItems="center" justifyContent="center">
+        <Box flex={1} bg="transparent" alignItems="center" justifyContent="center">
           <Spinner color="$primary400" />
         </Box>
       </SafeAreaView>
@@ -69,7 +69,7 @@ export default function VolumeDashboardScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <Box flex={1} bg="$backgroundDark950" px="$4" pt="$4">
+      <Box flex={1} bg="transparent" px="$4" pt="$4">
         <AnimatedBackground />
         <Text color={colors.accent} fontSize={12} fontWeight="$bold" letterSpacing={1.2} textTransform="uppercase">
           {t('volume.thisWeek')}

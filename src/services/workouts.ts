@@ -108,6 +108,16 @@ export async function getOrCreateWorkoutForDate(userId: string, dateKey: string)
   return created.id;
 }
 
+/**
+ * Today's workout, created if this is the first set of the day. A row created
+ * here is a live session, so it gets `started_at` - that's what separates it
+ * from a day back-filled through getOrCreateWorkoutForDate, which has no
+ * honest start time.
+ *
+ * An existing row that predates session tracking (or was created by the web
+ * app) is adopted as-is rather than stamped: writing "started now" onto a
+ * workout whose first set was logged hours ago would invent a duration.
+ */
 async function getOrCreateTodayWorkout(userId: string): Promise<string> {
   const { data: existing, error: findError } = await supabase
     .from('workouts')
@@ -123,7 +133,7 @@ async function getOrCreateTodayWorkout(userId: string): Promise<string> {
 
   const { data: created, error: createError } = await supabase
     .from('workouts')
-    .insert({ user_id: userId })
+    .insert({ user_id: userId, started_at: new Date().toISOString() })
     .select('id')
     .single();
 
@@ -226,4 +236,153 @@ export async function logSet(params: {
     setType,
     rpe,
   };
+}
+
+/**
+ * Corrects an already-logged set. Everything downstream - volume totals, PR
+ * detection, load suggestions - reads these rows, so without this a mistyped
+ * weight quietly poisons every number the app shows.
+ */
+export async function updateSet(
+  setId: string,
+  values: { weightKg: number; reps: number; setType: SetType; rpe?: number }
+): Promise<void> {
+  const { error } = await supabase
+    .from('sets')
+    .update({
+      weight: values.weightKg,
+      reps: values.reps,
+      set_type: values.setType,
+      rpe: values.rpe ?? null,
+    })
+    .eq('id', setId);
+
+  if (error) throw error;
+}
+
+export async function deleteSet(setId: string): Promise<void> {
+  const { error } = await supabase.from('sets').delete().eq('id', setId);
+  if (error) throw error;
+}
+
+/** The session in progress: today's workout that was started and not ended. */
+export async function fetchActiveSession(userId: string): Promise<WorkoutSessionRow | null> {
+  const { data, error } = await supabase
+    .from('workouts')
+    .select('id, created_at, started_at, finished_at')
+    .eq('user_id', userId)
+    .is('finished_at', null)
+    .gte('created_at', startOfTodayIso())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  return {
+    id: data.id,
+    // A row from before session tracking has no started_at; its creation time
+    // is the closest honest answer rather than showing no timer at all.
+    startedAt: new Date(data.started_at ?? data.created_at).getTime(),
+    finishedAt: null,
+  };
+}
+
+export interface WorkoutSessionRow {
+  id: string;
+  startedAt: number;
+  finishedAt: number | null;
+}
+
+/** Ends the session and hands back the finish time used, for the summary. */
+export async function finishWorkout(workoutId: string): Promise<number> {
+  const finishedAt = new Date();
+  const { error } = await supabase
+    .from('workouts')
+    .update({ finished_at: finishedAt.toISOString() })
+    .eq('id', workoutId);
+
+  if (error) throw error;
+  return finishedAt.getTime();
+}
+
+export interface SessionSummary {
+  workoutId: string;
+  dateKey: string;
+  startedAt: number | null;
+  finishedAt: number | null;
+  /** Seconds, or null when the session was never explicitly started/ended. */
+  durationSeconds: number | null;
+  /** Started but never finished - the user closed the app mid-session. Kept
+   *  distinct from a back-filled day, which never had a clock at all. */
+  unfinished: boolean;
+  setCount: number;
+  totalVolumeKg: number;
+  exerciseNames: string[];
+}
+
+interface HistoryRow {
+  id: string;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  workout_exercises: { name: string; sets: { weight: number; reps: number; completed: boolean }[] }[];
+}
+
+function toDateKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Past sessions, newest first, with their totals rolled up. Aggregating in one
+ * nested select rather than a query per workout keeps the history screen to a
+ * single round trip.
+ *
+ * Workouts with no completed sets are dropped: an empty row gets created the
+ * moment a day is opened, and listing those as "sessions" would pad the
+ * history with days nothing happened.
+ */
+export async function fetchSessionHistory(userId: string, limit = 30): Promise<SessionSummary[]> {
+  const { data, error } = await supabase
+    .from('workouts')
+    .select('id, created_at, started_at, finished_at, workout_exercises(name, sets(weight, reps, completed))')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+
+  return ((data ?? []) as unknown as HistoryRow[])
+    .map((row) => {
+      let setCount = 0;
+      let totalVolumeKg = 0;
+      const exerciseNames: string[] = [];
+
+      for (const we of row.workout_exercises ?? []) {
+        const done = (we.sets ?? []).filter((s) => s.completed);
+        if (done.length === 0) continue;
+        exerciseNames.push(we.name);
+        setCount += done.length;
+        for (const s of done) totalVolumeKg += Number(s.weight) * s.reps;
+      }
+
+      const startedAt = row.started_at ? new Date(row.started_at).getTime() : null;
+      const finishedAt = row.finished_at ? new Date(row.finished_at).getTime() : null;
+
+      return {
+        workoutId: row.id,
+        dateKey: toDateKey(row.created_at),
+        startedAt,
+        finishedAt,
+        durationSeconds:
+          startedAt != null && finishedAt != null ? Math.round((finishedAt - startedAt) / 1000) : null,
+        unfinished: startedAt != null && finishedAt == null,
+        setCount,
+        totalVolumeKg: Math.round(totalVolumeKg),
+        exerciseNames,
+      };
+    })
+    .filter((session) => session.setCount > 0);
 }

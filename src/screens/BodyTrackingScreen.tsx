@@ -157,7 +157,7 @@ export default function BodyTrackingScreen() {
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1 }}>
-        <Box flex={1} bg="$backgroundDark950" alignItems="center" justifyContent="center">
+        <Box flex={1} bg="transparent" alignItems="center" justifyContent="center">
           <Spinner color="$primary400" />
         </Box>
       </SafeAreaView>
@@ -166,7 +166,7 @@ export default function BodyTrackingScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <Box flex={1} bg="$backgroundDark950">
+      <Box flex={1} bg="transparent">
         <AnimatedBackground />
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
           <Box px="$4" pt="$4" pb="$8">

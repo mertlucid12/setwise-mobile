@@ -70,7 +70,7 @@ export default function CheckboxGroup<T extends string>(props: SingleProps<T> | 
           <Pressable
             key={option.key}
             onPress={() => toggle(option.key)}
-            bg={checked ? '#2A0A0E' : colors.surfaceAlt}
+            bg={checked ? '#410001' : colors.surfaceAlt}
             borderWidth={1}
             borderColor={checked ? colors.primary : colors.border}
             borderRadius="$xl"

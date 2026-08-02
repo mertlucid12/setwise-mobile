@@ -43,6 +43,9 @@ interface Props {
   error: string | null;
   suggestionText?: string | null;
   targetText?: string | null;
+  /** 'edit' retitles the sheet and reveals the delete action. */
+  mode?: 'add' | 'edit';
+  onDelete?: () => void;
 }
 
 export default function LogSetModal({
@@ -63,8 +66,11 @@ export default function LogSetModal({
   error,
   suggestionText,
   targetText,
+  mode = 'add',
+  onDelete,
 }: Props) {
   const { t } = useI18n();
+  const isEdit = mode === 'edit';
   return (
     <Modal isOpen={visible} onClose={onClose}>
       <ModalBackdrop />
@@ -92,7 +98,7 @@ export default function LogSetModal({
                 </Text>
               )}
               <Heading color="$textDark0" size="md" numberOfLines={1}>
-                {exerciseName ?? t('logset.title')}
+                {isEdit ? t('logset.editTitle') : (exerciseName ?? t('logset.title'))}
               </Heading>
             </VStack>
           </HStack>
@@ -103,7 +109,7 @@ export default function LogSetModal({
 
         <ModalBody>
           <VStack space="md" pb="$2">
-            {(suggestionText || targetText) && (
+            {!isEdit && (suggestionText || targetText) && (
               <HStack alignItems="center" space="xs">
                 {suggestionText && (
                   <>
@@ -181,6 +187,24 @@ export default function LogSetModal({
             <Button borderRadius="$lg" bg="$primary500" onPress={onSubmit} isDisabled={saving}>
               <ButtonText>{saving ? '...' : t('common.save')}</ButtonText>
             </Button>
+
+            {/* Delete lives inside the edit sheet rather than on the row: a
+                one-tap destructive control next to the set you just logged is
+                too easy to hit by accident mid-workout. */}
+            {isEdit && onDelete && (
+              <Button
+                borderRadius="$lg"
+                variant="outline"
+                borderColor={colors.danger}
+                onPress={onDelete}
+                isDisabled={saving}
+              >
+                <HStack alignItems="center" space="xs">
+                  <Icon name="trash-outline" size={15} color={colors.danger} />
+                  <ButtonText color={colors.danger}>{t('logset.delete')}</ButtonText>
+                </HStack>
+              </Button>
+            )}
 
             {error && (
               <Text color={colors.danger} size="sm">

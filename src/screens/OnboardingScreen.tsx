@@ -137,7 +137,7 @@ export default function OnboardingScreen({ profile, saveProfile }: Props) {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <Box flex={1} bg="$backgroundDark950">
+      <Box flex={1} bg="transparent">
         <AnimatedBackground />
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <Box px="$4" pt="$4" pb="$8">

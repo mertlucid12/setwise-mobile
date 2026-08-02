@@ -7,3 +7,8 @@ export type RoutinesStackParamList = {
   RoutinesList: undefined;
   RoutineDetail: { routineId: string };
 };
+
+export type WorkoutStackParamList = {
+  WorkoutMain: undefined;
+  SessionHistory: undefined;
+};

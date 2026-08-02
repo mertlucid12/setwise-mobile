@@ -12,19 +12,25 @@ import {
   Spinner,
   SafeAreaView,
 } from '@gluestack-ui/themed';
+import { useNavigation } from '@react-navigation/native';
 import Icon from '@/components/Icon';
 import { useAppToast } from '@/components/AppToast';
 import { useExercises } from '@/hooks/useExercises';
 import { useWorkoutSets } from '@/hooks/useWorkoutSets';
+import { useWorkoutSession } from '@/hooks/useWorkoutSession';
 import { useProfile } from '@/hooks/useProfile';
 import { useActiveRoutine } from '@/contexts/ActiveRoutineContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useI18n } from '@/i18n';
 import { suggestNextLoad } from '@/services/volume';
-import { SetType } from '@/types';
+import { fetchSessionHistory, SessionSummary } from '@/services/workouts';
+import { formatDuration } from '@/services/sessionFormat';
+import { SetEntry, SetType } from '@/types';
 import AddExerciseModal from '@/components/AddExerciseModal';
 import ExerciseHistoryModal from '@/components/ExerciseHistoryModal';
 import ExercisePickerModal from '@/components/ExercisePickerModal';
 import LogSetModal from '@/components/LogSetModal';
+import WorkoutSummaryModal from '@/components/WorkoutSummaryModal';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import { muscleLabelKey, MUSCLE_ICONS } from '@/constants/muscleGroups';
 import { colors } from '@/theme';
@@ -40,9 +46,13 @@ function formatRestTime(seconds: number): string {
 export default function WorkoutLogScreen() {
   const { t } = useI18n();
   const { exercises, loading: exercisesLoading, addExercise } = useExercises();
-  const { sets, loading: setsLoading, logSet } = useWorkoutSets();
+  const { sets, loading: setsLoading, logSet, updateSet, deleteSet, lastSetFor } = useWorkoutSets();
   const { profile } = useProfile();
   const { activeRoutine, clearRoutine } = useActiveRoutine();
+  const { session, elapsedSeconds, finish: finishSession, reload: reloadSession } = useWorkoutSession();
+  const navigation = useNavigation();
+  const { session: authSession } = useAuth();
+  const userId = authSession?.user.id ?? null;
   const toast = useAppToast();
 
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
@@ -58,6 +68,11 @@ export default function WorkoutLogScreen() {
   const [historyVisible, setHistoryVisible] = useState(false);
   const [prBanner, setPrBanner] = useState<string | null>(null);
   const [restSeconds, setRestSeconds] = useState<number | null>(null);
+  /** Non-null while an already-logged set is open for correction. */
+  const [editingSet, setEditingSet] = useState<SetEntry | null>(null);
+  const [summaryVisible, setSummaryVisible] = useState(false);
+  const [summary, setSummary] = useState<SessionSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   const firstName = profile.displayName?.trim().split(/\s+/)[0] ?? null;
 
@@ -80,6 +95,96 @@ export default function WorkoutLogScreen() {
     return () => clearTimeout(timeout);
   }, [restSeconds]);
 
+  /**
+   * Opens the add-set sheet carrying the last set for this exercise. Typing
+   * the same numbers again every session is the single most repetitive part
+   * of logging, and the previous performance is also the reference point for
+   * deciding what to do next - so it starts there rather than blank.
+   */
+  function openAddSet() {
+    setError(null);
+    setEditingSet(null);
+    const previous = activeExerciseId ? lastSetFor(activeExerciseId) : null;
+    setWeight(previous ? String(previous.weightKg) : '');
+    setReps(previous ? String(previous.reps) : '');
+    setRpe('');
+    setSetType('normal');
+    setLogSetVisible(true);
+  }
+
+  function openEditSet(entry: SetEntry) {
+    setError(null);
+    setEditingSet(entry);
+    setWeight(String(entry.weightKg));
+    setReps(String(entry.reps));
+    setRpe(entry.rpe != null ? String(entry.rpe) : '');
+    setSetType(entry.setType);
+    setLogSetVisible(true);
+  }
+
+  async function handleUpdateSet() {
+    if (!editingSet || !weight || !reps) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await updateSet(editingSet.id, {
+        weightKg: parseFloat(weight),
+        reps: parseInt(reps, 10),
+        setType,
+        rpe: rpe ? parseFloat(rpe) : undefined,
+      });
+      setLogSetVisible(false);
+      setEditingSet(null);
+      toast({ title: t('toast.setUpdated'), description: `${weight}kg × ${reps}` });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t('workout.errSaveSet');
+      setError(message);
+      toast({ title: t('toast.error'), description: message, variant: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteSet() {
+    if (!editingSet) return;
+    setSaving(true);
+    try {
+      await deleteSet(editingSet.id);
+      setLogSetVisible(false);
+      setEditingSet(null);
+      toast({ title: t('toast.setDeleted'), variant: 'info' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t('workout.errSaveSet');
+      setError(message);
+      toast({ title: t('toast.error'), description: message, variant: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /**
+   * Ends the session, then pulls its rolled-up totals for the summary. The
+   * history query is reused rather than adding a per-workout endpoint - the
+   * session just finished is its newest row.
+   */
+  async function handleFinishSession() {
+    const workoutId = await finishSession();
+    clearRoutine();
+    if (!workoutId) return;
+
+    setSummary(null);
+    setSummaryLoading(true);
+    setSummaryVisible(true);
+    try {
+      const history = await fetchSessionHistory(userId ?? '', 5);
+      setSummary(history.find((s) => s.workoutId === workoutId) ?? null);
+    } catch {
+      setSummary(null);
+    } finally {
+      setSummaryLoading(false);
+    }
+  }
+
   async function handleLogSet() {
     if (!weight || !reps || !activeExerciseId || !activeExercise) return;
     setSaving(true);
@@ -98,6 +203,9 @@ export default function WorkoutLogScreen() {
       setRpe('');
       setLogSetVisible(false);
       setRestSeconds(REST_SECONDS_DEFAULT);
+      // The first set of the day is what creates the workout row, so that's
+      // the moment the session timer can start reading it.
+      if (!session) reloadSession();
       toast({
         title: t('toast.setLogged'),
         description: `${activeExercise.name} · ${weight}kg × ${reps}`,
@@ -118,7 +226,7 @@ export default function WorkoutLogScreen() {
   if (exercisesLoading) {
     return (
       <SafeAreaView style={{ flex: 1 }}>
-        <Box flex={1} bg="$backgroundDark950" alignItems="center" justifyContent="center">
+        <Box flex={1} bg="transparent" alignItems="center" justifyContent="center">
           <Spinner color="$primary400" />
         </Box>
       </SafeAreaView>
@@ -128,17 +236,19 @@ export default function WorkoutLogScreen() {
   // Only one status slot is ever shown at a time (PR > rest timer > active
   // routine) - stacking all three as separate cards was what made this
   // screen feel cramped.
-  const status: 'pr' | 'rest' | 'routine' | null = prBanner
+  const status: 'pr' | 'rest' | 'session' | 'routine' | null = prBanner
     ? 'pr'
     : restSeconds !== null
       ? 'rest'
-      : activeRoutine
-        ? 'routine'
-        : null;
+      : session
+        ? 'session'
+        : activeRoutine
+          ? 'routine'
+          : null;
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-    <Box flex={1} bg="$backgroundDark950" px="$4" pt="$4">
+    <Box flex={1} bg="transparent" px="$4" pt="$4">
       <AnimatedBackground />
       <HStack justifyContent="space-between" alignItems="flex-start" mb="$3">
         <VStack>
@@ -149,6 +259,20 @@ export default function WorkoutLogScreen() {
             {t('workout.title')}
           </Heading>
         </VStack>
+        <HStack space="xs">
+        <Pressable
+          onPress={() => navigation.navigate('SessionHistory' as never)}
+          w={36}
+          h={36}
+          borderRadius="$full"
+          bg="$backgroundDark900"
+          borderWidth={1}
+          borderColor="$borderDark800"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Icon name="time-outline" size={16} color={colors.textMuted} />
+        </Pressable>
         {activeExercise && (
           <Pressable
             onPress={() => setHistoryVisible(true)}
@@ -164,6 +288,7 @@ export default function WorkoutLogScreen() {
             <Icon name="stats-chart" size={16} color={colors.textMuted} />
           </Pressable>
         )}
+        </HStack>
       </HStack>
 
       {status && (
@@ -208,6 +333,24 @@ export default function WorkoutLogScreen() {
               </HStack>
             </>
           )}
+          {status === 'session' && (
+            <>
+              <HStack alignItems="center" space="xs" flex={1}>
+                <Icon name="flame" size={15} color={colors.accent} />
+                <Text color="$textDark0" fontWeight="$bold" size="sm" fontFamily="$mono">
+                  {formatDuration(elapsedSeconds)}
+                </Text>
+                <Text color={colors.textMuted} size="xs" numberOfLines={1} flex={1}>
+                  {activeRoutine ? activeRoutine.title : t('workout.sessionLive')}
+                </Text>
+              </HStack>
+              <Pressable onPress={handleFinishSession} hitSlop={8}>
+                <Text color={colors.accent} size="xs" fontWeight="$black" textTransform="uppercase">
+                  {t('workout.finish')}
+                </Text>
+              </Pressable>
+            </>
+          )}
           {status === 'routine' && (
             <>
               <HStack alignItems="center" space="xs">
@@ -218,7 +361,7 @@ export default function WorkoutLogScreen() {
               </HStack>
               <Pressable onPress={clearRoutine} hitSlop={8}>
                 <Text color={colors.textMuted} size="xs">
-                  {t('workout.finish')}
+                  {t('workout.clearRoutine')}
                 </Text>
               </Pressable>
             </>
@@ -289,6 +432,13 @@ export default function WorkoutLogScreen() {
         }}
       />
 
+      <WorkoutSummaryModal
+        visible={summaryVisible}
+        onClose={() => setSummaryVisible(false)}
+        summary={summary}
+        loading={summaryLoading}
+      />
+
       {activeExercise && (
         <ExerciseHistoryModal
           visible={historyVisible}
@@ -303,10 +453,7 @@ export default function WorkoutLogScreen() {
         bg="$primary500"
         mb="$4"
         isDisabled={!activeExercise}
-        onPress={() => {
-          setError(null);
-          setLogSetVisible(true);
-        }}
+        onPress={openAddSet}
       >
         <HStack alignItems="center" space="xs">
           <Icon name="add" size={18} color="#0E0E0E" />
@@ -316,7 +463,10 @@ export default function WorkoutLogScreen() {
 
       <LogSetModal
         visible={logSetVisible}
-        onClose={() => setLogSetVisible(false)}
+        onClose={() => {
+          setLogSetVisible(false);
+          setEditingSet(null);
+        }}
         exerciseName={activeExercise?.name}
         primaryMuscle={activeExercise?.primaryMuscle}
         weight={weight}
@@ -327,7 +477,9 @@ export default function WorkoutLogScreen() {
         onChangeReps={setReps}
         onChangeRpe={setRpe}
         onChangeSetType={setSetType}
-        onSubmit={handleLogSet}
+        onSubmit={editingSet ? handleUpdateSet : handleLogSet}
+        mode={editingSet ? 'edit' : 'add'}
+        onDelete={handleDeleteSet}
         saving={saving}
         error={error}
         suggestionText={
@@ -370,9 +522,13 @@ export default function WorkoutLogScreen() {
           keyExtractor={(item) => item.id}
           style={{ flex: 1 }}
           renderItem={({ item }) => (
-            <HStack
+            // Tapping a logged set opens it for correction - a mistyped weight
+            // used to be permanent, and it silently skewed volume, PRs and the
+            // load suggestion from then on.
+            <Pressable
+              onPress={() => openEditSet(item)}
+              flexDirection="row"
               alignItems="center"
-              space="sm"
               py="$3"
               px="$3"
               bg="$backgroundDark900"
@@ -381,7 +537,7 @@ export default function WorkoutLogScreen() {
               borderWidth={1}
               borderColor="$borderDark800"
             >
-              <Box w={24} h={24} borderRadius="$full" bg="$primary900" alignItems="center" justifyContent="center">
+              <Box w={24} h={24} borderRadius="$full" bg="$primary900" alignItems="center" justifyContent="center" mr="$2">
                 <Icon name="checkmark" size={14} color={colors.primaryLight} />
               </Box>
               <VStack flex={1}>
@@ -396,7 +552,10 @@ export default function WorkoutLogScreen() {
               <Text color="$textDark400" fontWeight="$semibold" size="sm" fontFamily="$mono">
                 {item.weightKg}kg × {item.reps}
               </Text>
-            </HStack>
+              <Box ml="$2">
+                <Icon name="chevron-forward" size={14} color={colors.textMuted} />
+              </Box>
+            </Pressable>
           )}
         />
       )}

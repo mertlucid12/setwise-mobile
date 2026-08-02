@@ -60,7 +60,7 @@ export default function AICoachScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <Box flex={1} bg="$backgroundDark950" px="$4" pt="$4">
+      <Box flex={1} bg="transparent" px="$4" pt="$4">
         <AnimatedBackground />
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <HStack alignItems="center" space="sm" mb="$3">

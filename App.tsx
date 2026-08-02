@@ -4,26 +4,24 @@ import { StatusBar } from 'expo-status-bar';
 import { GluestackUIProvider } from '@gluestack-ui/themed';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
+import { Anton_400Regular } from '@expo-google-fonts/anton';
 import {
-  Barlow_400Regular,
-  Barlow_500Medium,
-  Barlow_600SemiBold,
-  Barlow_700Bold,
-} from '@expo-google-fonts/barlow';
+  HankenGrotesk_400Regular,
+  HankenGrotesk_500Medium,
+  HankenGrotesk_600SemiBold,
+  HankenGrotesk_700Bold,
+  HankenGrotesk_800ExtraBold,
+  HankenGrotesk_900Black,
+} from '@expo-google-fonts/hanken-grotesk';
 import {
-  BarlowCondensed_500Medium,
-  BarlowCondensed_600SemiBold,
-  BarlowCondensed_700Bold,
-  BarlowCondensed_800ExtraBold,
-  BarlowCondensed_900Black,
-} from '@expo-google-fonts/barlow-condensed';
-import {
-  GeistMono_400Regular,
-  GeistMono_500Medium,
-  GeistMono_600SemiBold,
-  GeistMono_700Bold,
-} from '@expo-google-fonts/geist-mono';
+  JetBrainsMono_400Regular,
+  JetBrainsMono_500Medium,
+  JetBrainsMono_600SemiBold,
+  JetBrainsMono_700Bold,
+  JetBrainsMono_800ExtraBold,
+} from '@expo-google-fonts/jetbrains-mono';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import ShaderBackground from '@/components/ShaderBackground';
 import { gluestackConfig } from '@/theme';
 import { I18nProvider } from '@/i18n';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -33,22 +31,29 @@ import AppNavigator from '@/navigation/AppNavigator';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function App() {
+  /**
+   * Every weight used anywhere in the app has to be listed here: gluestack's
+   * FontResolver turns family + weight into a suffixed face name
+   * ("HankenGrotesk_900Black"), and a face that wasn't loaded resolves to
+   * nothing and silently falls back to the system font.
+   *
+   * Anton has exactly one weight, which is why the Heading theme asks for 400
+   * rather than 900. JetBrains Mono stops at 800, so mono runs use
+   * $extrabold as their heaviest.
+   */
   const [fontsLoaded] = useFonts({
-    Barlow_400Regular,
-    Barlow_500Medium,
-    Barlow_600SemiBold,
-    Barlow_700Bold,
-    BarlowCondensed_500Medium,
-    BarlowCondensed_600SemiBold,
-    BarlowCondensed_700Bold,
-    // Heading resolves to $black (900) app-wide; without this face loaded
-    // every heading would silently fall back to the system font.
-    BarlowCondensed_800ExtraBold,
-    BarlowCondensed_900Black,
-    GeistMono_400Regular,
-    GeistMono_500Medium,
-    GeistMono_600SemiBold,
-    GeistMono_700Bold,
+    Anton_400Regular,
+    HankenGrotesk_400Regular,
+    HankenGrotesk_500Medium,
+    HankenGrotesk_600SemiBold,
+    HankenGrotesk_700Bold,
+    HankenGrotesk_800ExtraBold,
+    HankenGrotesk_900Black,
+    JetBrainsMono_400Regular,
+    JetBrainsMono_500Medium,
+    JetBrainsMono_600SemiBold,
+    JetBrainsMono_700Bold,
+    JetBrainsMono_800ExtraBold,
   });
 
   useEffect(() => {
@@ -73,7 +78,11 @@ export default function App() {
         <GluestackUIProvider config={gluestackConfig} colorMode="dark">
           <AuthProvider>
             <ActiveRoutineProvider>
-              <StatusBar style="light" />
+                <StatusBar style="light" />
+              {/* One shader for the whole app: screen roots are transparent,
+                  so this drifts behind every tab. Cards keep their own opaque
+                  surfaces, which is what keeps text readable over it. */}
+              <ShaderBackground preset="ember" />
               {Platform.OS === 'web' ? (
                 // Web browsers already blur the focused input on an outside click;
                 // wrapping in TouchableWithoutFeedback would blur it on every click,

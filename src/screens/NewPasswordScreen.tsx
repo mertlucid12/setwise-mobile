@@ -44,7 +44,7 @@ export default function NewPasswordScreen() {
   }
 
   return (
-    <Box flex={1} bg="$backgroundDark950">
+    <Box flex={1} bg="transparent">
       <AnimatedBackground />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <VStack flex={1} justifyContent="center" px="$6" space="xl">

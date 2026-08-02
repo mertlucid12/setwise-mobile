@@ -5,6 +5,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Icon, { IconName } from '@/components/Icon';
 import WorkoutLogScreen from '@/screens/WorkoutLogScreen';
+import SessionHistoryScreen from '@/screens/SessionHistoryScreen';
+import TrainingProfileScreen from '@/screens/TrainingProfileScreen';
 import CalendarScreen from '@/screens/CalendarScreen';
 import RoutinesScreen from '@/screens/RoutinesScreen';
 import RoutineDetailScreen from '@/screens/RoutineDetailScreen';
@@ -25,12 +27,24 @@ const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
 const RoutinesStack = createNativeStackNavigator();
+const WorkoutStack = createNativeStackNavigator();
 
 // The detail screen draws its own hero under the status bar, so the stack
 // header stays off and back navigation lives in the hero itself.
+/** Session history hangs off the workout tab rather than becoming a seventh
+ *  tab - it's something you consult after training, not a destination. */
+function WorkoutStackNavigator() {
+  return (
+    <WorkoutStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
+      <WorkoutStack.Screen name="WorkoutMain" component={WorkoutLogScreen} />
+      <WorkoutStack.Screen name="SessionHistory" component={SessionHistoryScreen} />
+    </WorkoutStack.Navigator>
+  );
+}
+
 function RoutinesStackNavigator() {
   return (
-    <RoutinesStack.Navigator screenOptions={{ headerShown: false }}>
+    <RoutinesStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
       <RoutinesStack.Screen name="RoutinesList" component={RoutinesScreen} />
       <RoutinesStack.Screen name="RoutineDetail" component={RoutineDetailScreen} />
     </RoutinesStack.Navigator>
@@ -39,16 +53,19 @@ function RoutinesStackNavigator() {
 
 function ProfileStackNavigator() {
   return (
-    <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
+    <ProfileStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
       <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
       <ProfileStack.Screen name="BodyTracking" component={BodyTrackingScreen} />
+      <ProfileStack.Screen name="TrainingProfile" component={TrainingProfileScreen} />
     </ProfileStack.Navigator>
   );
 }
 
 const setwiseTheme = {
   ...DarkTheme,
-  colors: { ...DarkTheme.colors, background: colors.bg, card: colors.bg, border: colors.border },
+  // Transparent so the app-wide shader shows through the navigator's own
+  // scene container; every screen root is transparent for the same reason.
+  colors: { ...DarkTheme.colors, background: 'transparent', card: colors.bg, border: colors.border },
 };
 
 // Route names stay stable (used by navigation.navigate); only the visible
@@ -62,7 +79,7 @@ const TAB_META: Record<string, { icon: IconName; labelKey: string }> = {
   Profil: { icon: 'person-circle', labelKey: 'tab.profile' },
 };
 
-const TransitionedWorkoutLog = withScreenTransition(WorkoutLogScreen);
+const TransitionedWorkoutLog = withScreenTransition(WorkoutStackNavigator);
 const TransitionedCalendar = withScreenTransition(CalendarScreen);
 const TransitionedRoutines = withScreenTransition(RoutinesStackNavigator);
 const TransitionedVolume = withScreenTransition(VolumeDashboardScreen);
@@ -70,22 +87,26 @@ const TransitionedCoach = withScreenTransition(AICoachScreen);
 const TransitionedProfileStack = withScreenTransition(ProfileStackNavigator);
 
 // Docked (not absolute) so every screen keeps reserving its height in the
-// normal layout - no per-screen bottom-padding fixes needed - while still
-// reading as a rounded, elevated "pill bar" via top corner radius + shadow
-// + a highlight capsule behind the focused icon.
+// normal layout - no per-screen bottom-padding fixes needed.
+//
+// The focused tab is a solid block of the action red, capped with a molten
+// orange rule - straight from the reference, where the active tab is the one
+// filled element on the bar. A hard-edged block states it far louder than the
+// tinted capsule this used to be.
 function TabIcon({ icon, color, focused }: { icon: IconName; color: string; focused: boolean }) {
   return (
     <View
       style={{
-        width: 40,
-        height: 26,
-        borderRadius: 14,
-        backgroundColor: focused ? 'rgba(212, 175, 55, 0.15)' : 'transparent',
+        width: 46,
+        height: 30,
+        backgroundColor: focused ? colors.primary : 'transparent',
+        borderTopWidth: focused ? 3 : 0,
+        borderTopColor: colors.secondary,
         alignItems: 'center',
         justifyContent: 'center',
       }}
     >
-      <Icon name={icon} size={18} color={color} />
+      <Icon name={icon} size={18} color={focused ? colors.onPrimary : color} />
     </View>
   );
 }
@@ -94,13 +115,16 @@ function MainTabs() {
   const { t } = useI18n();
   return (
     <Tab.Navigator
+      sceneContainerStyle={{ backgroundColor: 'transparent' }}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopWidth: 0,
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
+          // The reference caps the nav with a 2px rule in the action colour
+          // over the deepest surface tier - that rule is what stops the bar
+          // reading as a floating panel and makes it a plate bolted on.
+          borderTopWidth: 2,
+          borderTopColor: colors.primary,
+          backgroundColor: colors.well,
           height: 68,
           paddingBottom: 12,
           paddingTop: 6,
@@ -108,7 +132,13 @@ function MainTabs() {
         },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: 2 },
+        tabBarLabelStyle: {
+          fontSize: 9,
+          fontFamily: 'JetBrainsMono_500Medium',
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+          marginTop: 3,
+        },
         tabBarLabel: t(TAB_META[route.name].labelKey),
         tabBarIcon: ({ color, focused }) => <TabIcon icon={TAB_META[route.name].icon} color={color} focused={focused} />,
       })}

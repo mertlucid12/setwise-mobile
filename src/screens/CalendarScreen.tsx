@@ -81,7 +81,7 @@ function StatCard({ icon, value, unit, label }: { icon: IconName; value: string;
     >
       <Icon name={icon} size={16} color={colors.accent} />
       <HStack alignItems="baseline" space="xs">
-        <Text color="$textDark0" fontSize={20} fontWeight="$black" fontFamily="$mono">
+        <Text color="$textDark0" fontSize={20} fontWeight="$extrabold" fontFamily="$mono">
           {value}
         </Text>
         {unit && (
@@ -277,7 +277,7 @@ export default function CalendarScreen() {
     const isSelected = dateKey === selectedDateKey;
     const isFuture = dateKey > todayKey;
 
-    const background = isSelected ? colors.primary : hasWorkout ? '#2A0A0E' : colors.surface;
+    const background = isSelected ? colors.primary : hasWorkout ? '#410001' : colors.surface;
     const borderColor = isSelected ? colors.accent : isToday ? colors.accent : colors.border;
 
     return (
@@ -347,13 +347,13 @@ export default function CalendarScreen() {
   }
 
   return (
-    <Box flex={1} bg={colors.bg}>
+    <Box flex={1} bg="transparent">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Hero - full-bleed crimson under the status bar, matching the routine
             detail screen so the calendar doesn't read as a plainer tab. */}
         <Box h={HERO_HEIGHT}>
           <LinearGradient
-            colors={['#A31621', '#500A10', colors.bg]}
+            colors={['#E6211E', '#690003', colors.bg]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{ position: 'absolute', top: 0, left: 0, right: 0, height: HERO_HEIGHT }}
@@ -501,7 +501,7 @@ export default function CalendarScreen() {
                   alignItems="center"
                   justifyContent="center"
                 >
-                  <Text color="$textDark0" fontSize={19} fontWeight="$black" fontFamily="$mono">
+                  <Text color="$textDark0" fontSize={19} fontWeight="$extrabold" fontFamily="$mono">
                     {selectedDate.getDate()}
                   </Text>
                 </Box>

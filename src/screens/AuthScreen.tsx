@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { Animated, KeyboardAvoidingView, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -21,6 +21,7 @@ import Icon from '@/components/Icon';
 import HeroSlashes from '@/components/HeroSlashes';
 import TextFlippingBoard from '@/components/TextFlippingBoard';
 import WarriorBackground from '@/components/WarriorBackground';
+import ShaderBackground from '@/components/ShaderBackground';
 import { useAppToast } from '@/components/AppToast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useI18n } from '@/i18n';
@@ -53,13 +54,15 @@ const SLOGANS = [
   'IRON\nDONT\nLIE',
 ];
 
-/** Board geometry. It sits in the gutter beside the form, level with the top
- *  of the card, so its width is bounded by whatever is left over next to a
- *  COLUMN_MAX_WIDTH column - four columns at this tile size is what fits.
- *  Every slogan line above therefore stays within four characters. */
+/** Board geometry. It sits in the gutter beside the form column, so its width
+ *  is bounded by whatever is left over next to a COLUMN_MAX_WIDTH card - four
+ *  columns at this tile size is what fits. Every slogan line above therefore
+ *  stays within four characters. */
 const BOARD_ROWS = 4;
 const BOARD_COLS = 4;
 const BOARD_TILE = 55;
+const BOARD_GAP = 4;
+const BOARD_WIDTH = BOARD_COLS * BOARD_TILE + (BOARD_COLS - 1) * BOARD_GAP;
 
 /** Crimson hero shared by the auth screen's two states. */
 function AuthHero({
@@ -75,7 +78,7 @@ function AuthHero({
   return (
     <Box h={HERO_HEIGHT}>
       <LinearGradient
-        colors={['#A31621', '#500A10', colors.bg]}
+        colors={['#E6211E', '#690003', colors.bg]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, height: HERO_HEIGHT }}
@@ -175,6 +178,13 @@ export default function AuthScreen() {
   const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
   const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState<string | null>(null);
   const [resendSent, setResendSent] = useState(false);
+
+  // The gutter is the strip left over beside the centred form column. On a
+  // phone there isn't one, and a board wedged behind the card would just be
+  // invisible clutter - so below the threshold it simply doesn't render.
+  const { width } = useWindowDimensions();
+  const gutter = Math.max(0, (width - COLUMN_MAX_WIDTH) / 2);
+  const showBoard = gutter >= BOARD_WIDTH + 24;
 
   const cardAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -288,7 +298,7 @@ export default function AuthScreen() {
 
   if (pendingConfirmationEmail) {
     return (
-      <Box flex={1} bg={colors.bg}>
+      <Box flex={1} bg="transparent">
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
             <AuthHero icon="mail-unread-outline" title={t('auth.confirmTitle')} subtitle={t('auth.confirmKicker')} />
@@ -350,17 +360,32 @@ export default function AuthScreen() {
         : t('auth.signUpSubtitle');
 
   return (
-    <Box flex={1} bg={colors.bg}>
-      {/* Embers sit behind the scroll content, above the flat background. */}
+    <Box flex={1} bg="transparent">
+      {/* The login screen runs the brighter "forge" shader instead of the
+          app-wide ember one, with the rising embers on top of it. */}
+      <ShaderBackground preset="forge" overlayOpacity={0.35} />
       <WarriorBackground />
 
       {/* The board lives in the background layer rather than the scroll flow:
-          in-flow it landed below the fold on a tall screen. Its top is pinned
-          to the card's top edge so the two read as one row, and it's
-          non-interactive. Only on the two main modes - the reset detour is a
-          task, and theatre mid-task is noise. */}
-      {mode !== 'forgotPassword' && (
-        <Box position="absolute" right={10} top={HERO_HEIGHT - PANEL_OVERLAP} pointerEvents="none">
+          in-flow it landed below the fold on a tall screen. It fills the whole
+          gutter beside the form column and centres itself inside it, both
+          axes - flush against the screen edge it read as something that had
+          slid off. Non-interactive, and only on the two main modes: the reset
+          detour is a task, and theatre mid-task is noise. */}
+      {mode !== 'forgotPassword' && showBoard && (
+        <Box
+          position="absolute"
+          right={0}
+          // Centred in the space *below* the hero, not the whole screen -
+          // measured against the full height its top row slid up behind the
+          // crimson band and got clipped.
+          top={HERO_HEIGHT}
+          bottom={0}
+          w={gutter}
+          alignItems="center"
+          justifyContent="center"
+          pointerEvents="none"
+        >
           <TextFlippingBoard
             messages={SLOGANS}
             rows={BOARD_ROWS}
