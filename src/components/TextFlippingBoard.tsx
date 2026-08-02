@@ -24,6 +24,14 @@ const HOLD_TICKS = 55;
 /** Chance an idle blank cell riffles on any given hold tick. */
 const IDLE_FLIP_CHANCE = 0.06;
 
+/**
+ * Lit tiles cycle through the brand's three hot colours instead of a single
+ * gold, which is what stops a large board from reading as one flat block.
+ * The colour comes from the cell's position, not from random, so a letter
+ * doesn't change colour every time it riffles.
+ */
+const PALETTE = [colors.accentSoft, '#FF9D3D', colors.primaryLight];
+
 interface Props {
   /** Lines to cycle through. Newlines split a message across board rows. */
   messages: string[];
@@ -110,26 +118,34 @@ export default function TextFlippingBoard({ messages, rows = 4, cols = 9, tileSi
       {Array.from({ length: rows }, (_, row) => (
         <HStack key={row} space="xs">
           {Array.from({ length: cols }, (_, col) => {
-            const char = cells[row * cols + col] ?? ' ';
+            const index = row * cols + col;
+            const char = cells[index] ?? ' ';
             const lit = char !== ' ';
+            const tint = PALETTE[(row + col) % PALETTE.length];
             return (
               <Box
                 key={col}
                 w={tileSize}
                 h={tileSize * 1.35}
                 borderRadius="$sm"
-                bg={lit ? 'rgba(10, 9, 8, 0.72)' : 'rgba(10, 9, 8, 0.34)'}
+                bg={lit ? 'rgba(10, 9, 8, 0.82)' : 'rgba(10, 9, 8, 0.34)'}
                 borderWidth={1}
-                borderColor={lit ? 'rgba(212, 175, 55, 0.35)' : 'rgba(255, 255, 255, 0.10)'}
+                borderColor={lit ? tint : 'rgba(255, 255, 255, 0.10)'}
                 alignItems="center"
                 justifyContent="center"
                 overflow="hidden"
+                // A lit flap glows in its own colour, which is what carries the
+                // board across a dark screen at this size.
+                shadowColor={lit ? tint : 'transparent'}
+                shadowOffset={{ width: 0, height: 0 }}
+                shadowOpacity={lit ? 0.55 : 0}
+                shadowRadius={lit ? tileSize * 0.3 : 0}
               >
                 {/* The hairline is the split-flap seam - it's what makes a
                     tile read as a mechanical flap rather than a text box. */}
                 <Box position="absolute" left={0} right={0} top="50%" h={1} bg="rgba(0, 0, 0, 0.55)" />
                 <Text
-                  color={colors.accentSoft}
+                  color={tint}
                   fontSize={tileSize * 0.6}
                   lineHeight={tileSize * 0.72}
                   fontWeight="$black"

@@ -41,36 +41,35 @@ const PANEL_OVERLAP = 20;
 type Mode = 'signIn' | 'signUp' | 'forgotPassword';
 
 /**
- * Brand line for the split-flap board under the wordmark. Kept in English on
+ * Brand lines for the split-flap board beside the form. Kept in English on
  * both locales on purpose: it's the slogan, not copy - the same way a logo
  * isn't translated. The charset the board flips through is A-Z0-9 only, so
  * these must stay uppercase and unaccented.
  */
 const SLOGANS = [
   'LET\nTHE\nMAN\nBORN',
-  'NO ONE\nIS\nCOMING',
-  'PAIN\nIS\nPROOF',
   'EARN\nYOUR\nBODY',
+  'NO\nEASY\nDAYS',
+  'IRON\nDONT\nLIE',
 ];
 
-/** Board geometry. Six columns is the widest that still leaves the wordmark
- *  room on a phone, so every slogan line above stays within six characters. */
+/** Board geometry. It sits in the gutter beside the form, level with the top
+ *  of the card, so its width is bounded by whatever is left over next to a
+ *  COLUMN_MAX_WIDTH column - four columns at this tile size is what fits.
+ *  Every slogan line above therefore stays within four characters. */
 const BOARD_ROWS = 4;
-const BOARD_COLS = 6;
-const BOARD_TILE = 22;
+const BOARD_COLS = 4;
+const BOARD_TILE = 55;
 
 /** Crimson hero shared by the auth screen's two states. */
 function AuthHero({
   icon,
   title,
   subtitle,
-  board = false,
 }: {
   icon: 'barbell' | 'mail-unread-outline';
   title: string;
   subtitle: string;
-  /** Shows the split-flap slogan board in the hero's open right-hand side. */
-  board?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   return (
@@ -82,12 +81,6 @@ function AuthHero({
         style={{ position: 'absolute', top: 0, left: 0, right: 0, height: HERO_HEIGHT }}
       />
       <HeroSlashes height={HERO_HEIGHT} />
-
-      {board && (
-        <Box position="absolute" right={12} top={insets.top + 10} pointerEvents="none">
-          <TextFlippingBoard messages={SLOGANS} rows={BOARD_ROWS} cols={BOARD_COLS} tileSize={BOARD_TILE} />
-        </Box>
-      )}
 
       <VStack
         flex={1}
@@ -119,7 +112,7 @@ function AuthHero({
         <Heading color="$textDark0" fontSize={40} lineHeight={42} letterSpacing={4}>
           {title}
         </Heading>
-        <HStack alignItems="center" space="xs" pr={board ? BOARD_COLS * (BOARD_TILE + 4) - 40 : 0}>
+        <HStack alignItems="center" space="xs">
           <Box w={16} h={2} bg={colors.accent} />
           <Text color={colors.accentSoft} fontSize={11} fontWeight="$bold" letterSpacing={1.2} textTransform="uppercase" flex={1}>
             {subtitle}
@@ -360,20 +353,29 @@ export default function AuthScreen() {
     <Box flex={1} bg={colors.bg}>
       {/* Embers sit behind the scroll content, above the flat background. */}
       <WarriorBackground />
+
+      {/* The board lives in the background layer rather than the scroll flow:
+          in-flow it landed below the fold on a tall screen. Its top is pinned
+          to the card's top edge so the two read as one row, and it's
+          non-interactive. Only on the two main modes - the reset detour is a
+          task, and theatre mid-task is noise. */}
+      {mode !== 'forgotPassword' && (
+        <Box position="absolute" right={10} top={HERO_HEIGHT - PANEL_OVERLAP} pointerEvents="none">
+          <TextFlippingBoard
+            messages={SLOGANS}
+            rows={BOARD_ROWS}
+            cols={BOARD_COLS}
+            tileSize={BOARD_TILE}
+          />
+        </Box>
+      )}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* The board only runs on the two main modes - the reset detour is
-              a task, and theatre in the middle of it is noise. */}
-          <AuthHero
-            icon="barbell"
-            title="SETWISE"
-            subtitle={heroSubtitle}
-            board={mode !== 'forgotPassword'}
-          />
+          <AuthHero icon="barbell" title="SETWISE" subtitle={heroSubtitle} />
 
           <Animated.View
             style={{
