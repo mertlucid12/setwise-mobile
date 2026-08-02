@@ -19,6 +19,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Icon from '@/components/Icon';
 import HeroSlashes from '@/components/HeroSlashes';
+import TextFlippingBoard from '@/components/TextFlippingBoard';
+import WarriorBackground from '@/components/WarriorBackground';
+import { useAppToast } from '@/components/AppToast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useI18n } from '@/i18n';
 import { colors, cardShadow } from '@/theme';
@@ -26,7 +29,7 @@ import { colors, cardShadow } from '@/theme';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_NOT_CONFIRMED = 'Email not confirmed';
 
-const HERO_HEIGHT = 230;
+const HERO_HEIGHT = 268;
 /** shadcn's login block caps its column at max-w-sm; same idea here so the
  *  form stays a readable column on tablets and the web build instead of
  *  stretching edge to edge. */
@@ -37,8 +40,38 @@ const PANEL_OVERLAP = 20;
 
 type Mode = 'signIn' | 'signUp' | 'forgotPassword';
 
+/**
+ * Brand line for the split-flap board under the wordmark. Kept in English on
+ * both locales on purpose: it's the slogan, not copy - the same way a logo
+ * isn't translated. The charset the board flips through is A-Z0-9 only, so
+ * these must stay uppercase and unaccented.
+ */
+const SLOGANS = [
+  'LET\nTHE\nMAN\nBORN',
+  'NO ONE\nIS\nCOMING',
+  'PAIN\nIS\nPROOF',
+  'EARN\nYOUR\nBODY',
+];
+
+/** Board geometry. Six columns is the widest that still leaves the wordmark
+ *  room on a phone, so every slogan line above stays within six characters. */
+const BOARD_ROWS = 4;
+const BOARD_COLS = 6;
+const BOARD_TILE = 22;
+
 /** Crimson hero shared by the auth screen's two states. */
-function AuthHero({ icon, title, subtitle }: { icon: 'barbell' | 'mail-unread-outline'; title: string; subtitle: string }) {
+function AuthHero({
+  icon,
+  title,
+  subtitle,
+  board = false,
+}: {
+  icon: 'barbell' | 'mail-unread-outline';
+  title: string;
+  subtitle: string;
+  /** Shows the split-flap slogan board in the hero's open right-hand side. */
+  board?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   return (
     <Box h={HERO_HEIGHT}>
@@ -49,6 +82,12 @@ function AuthHero({ icon, title, subtitle }: { icon: 'barbell' | 'mail-unread-ou
         style={{ position: 'absolute', top: 0, left: 0, right: 0, height: HERO_HEIGHT }}
       />
       <HeroSlashes height={HERO_HEIGHT} />
+
+      {board && (
+        <Box position="absolute" right={12} top={insets.top + 10} pointerEvents="none">
+          <TextFlippingBoard messages={SLOGANS} rows={BOARD_ROWS} cols={BOARD_COLS} tileSize={BOARD_TILE} />
+        </Box>
+      )}
 
       <VStack
         flex={1}
@@ -80,7 +119,7 @@ function AuthHero({ icon, title, subtitle }: { icon: 'barbell' | 'mail-unread-ou
         <Heading color="$textDark0" fontSize={40} lineHeight={42} letterSpacing={4}>
           {title}
         </Heading>
-        <HStack alignItems="center" space="xs">
+        <HStack alignItems="center" space="xs" pr={board ? BOARD_COLS * (BOARD_TILE + 4) - 40 : 0}>
           <Box w={16} h={2} bg={colors.accent} />
           <Text color={colors.accentSoft} fontSize={11} fontWeight="$bold" letterSpacing={1.2} textTransform="uppercase" flex={1}>
             {subtitle}
@@ -118,7 +157,16 @@ function SegmentTab({ label, active, onPress }: { label: string; active: boolean
 
 export default function AuthScreen() {
   const { t } = useI18n();
-  const { signIn, signUp, signInWithGoogle, resendConfirmationEmail, resetPasswordForEmail } = useAuth();
+  const {
+    signIn,
+    signUp,
+    signInWithGoogle,
+    resendConfirmationEmail,
+    resetPasswordForEmail,
+    sessionExpired,
+    acknowledgeSessionExpired,
+  } = useAuth();
+  const toast = useAppToast();
   const [mode, setMode] = useState<Mode>('signIn');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -139,6 +187,17 @@ export default function AuthScreen() {
   useEffect(() => {
     Animated.timing(cardAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
   }, [cardAnim]);
+
+  // Landing on a login form with no explanation reads as a bug, so say why.
+  useEffect(() => {
+    if (!sessionExpired) return;
+    toast({
+      title: t('toast.sessionExpired'),
+      description: t('toast.sessionExpiredBody'),
+      variant: 'info',
+    });
+    acknowledgeSessionExpired();
+  }, [sessionExpired, acknowledgeSessionExpired, toast, t]);
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -180,6 +239,8 @@ export default function AuthScreen() {
         setUnconfirmedEmail(email.trim());
       } else if (authError) {
         setError(authError);
+      } else {
+        toast({ title: t('toast.signedIn') });
       }
       return;
     }
@@ -195,6 +256,7 @@ export default function AuthScreen() {
       return;
     }
     if (needsEmailConfirmation) setPendingConfirmationEmail(email.trim());
+    else toast({ title: t('toast.signedUp') });
   }
 
   async function handleResendConfirmation(targetEmail: string) {
@@ -215,8 +277,12 @@ export default function AuthScreen() {
     setError(null);
     const { error: resetError } = await resetPasswordForEmail(email.trim());
     setLoading(false);
-    if (resetError) setError(resetError);
-    else setResetSent(true);
+    if (resetError) {
+      setError(resetError);
+    } else {
+      setResetSent(true);
+      toast({ title: t('toast.resetSent'), description: email.trim() });
+    }
   }
 
   async function handleGoogleSignIn() {
@@ -292,13 +358,22 @@ export default function AuthScreen() {
 
   return (
     <Box flex={1} bg={colors.bg}>
+      {/* Embers sit behind the scroll content, above the flat background. */}
+      <WarriorBackground />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <AuthHero icon="barbell" title="SETWISE" subtitle={heroSubtitle} />
+          {/* The board only runs on the two main modes - the reset detour is
+              a task, and theatre in the middle of it is noise. */}
+          <AuthHero
+            icon="barbell"
+            title="SETWISE"
+            subtitle={heroSubtitle}
+            board={mode !== 'forgotPassword'}
+          />
 
           <Animated.View
             style={{
@@ -306,7 +381,13 @@ export default function AuthScreen() {
               transform: [{ translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
             }}
           >
-            <Box px="$5" mt={-PANEL_OVERLAP} w="100%" maxWidth={COLUMN_MAX_WIDTH} alignSelf="center">
+            <Box
+              px="$5"
+              mt={-PANEL_OVERLAP}
+              w="100%"
+              maxWidth={COLUMN_MAX_WIDTH}
+              alignSelf="center"
+            >
               <Box
                 bg={colors.surface}
                 borderRadius="$2xl"

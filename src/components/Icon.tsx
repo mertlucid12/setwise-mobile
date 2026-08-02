@@ -3,6 +3,7 @@ import Activity from 'lucide-react-native/icons/activity';
 import Anvil from 'lucide-react-native/icons/anvil';
 import Award from 'lucide-react-native/icons/award';
 import BicepsFlexed from 'lucide-react-native/icons/biceps-flexed';
+import CalendarDays from 'lucide-react-native/icons/calendar-days';
 import ChartColumn from 'lucide-react-native/icons/chart-column';
 import Check from 'lucide-react-native/icons/check';
 import ChevronDown from 'lucide-react-native/icons/chevron-down';
@@ -42,7 +43,6 @@ import Shield from 'lucide-react-native/icons/shield';
 import Sparkles from 'lucide-react-native/icons/sparkles';
 import Sprout from 'lucide-react-native/icons/sprout';
 import Swords from 'lucide-react-native/icons/swords';
-import Target from 'lucide-react-native/icons/target';
 import Trash2 from 'lucide-react-native/icons/trash-2';
 import TrendingDown from 'lucide-react-native/icons/trending-down';
 import TrendingUp from 'lucide-react-native/icons/trending-up';
@@ -76,7 +76,8 @@ const ICONS = {
   'barbell-outline': Dumbbell,
   'body-outline': Shield,
   bulb: Lightbulb,
-  calendar: Target,
+  calendar: CalendarDays,
+  'calendar-outline': CalendarDays,
   checkmark: Check,
   'checkmark-circle': CircleCheck,
   'chevron-back': ChevronLeft,

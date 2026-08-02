@@ -51,6 +51,9 @@ export default function ExercisePickerModal({
         </ModalHeader>
 
         <ModalBody>
+          {/* ModalBody is itself a ScrollView, so the browser's list must be
+              height-bounded - an unbounded nested vertical ScrollView measures
+              to nothing on Android and the list renders as an empty panel. */}
           <ExerciseBrowser
             exercises={exercises}
             selectedExerciseId={selectedExerciseId}
@@ -58,6 +61,7 @@ export default function ExercisePickerModal({
               onSelect(exerciseId);
               onClose();
             }}
+            maxHeight={420}
           />
         </ModalBody>
 

@@ -39,14 +39,21 @@ export async function fetchMeasurements(userId: string): Promise<BodyMeasurement
   return ((data ?? []) as MeasurementRow[]).map(rowToMeasurement);
 }
 
+/**
+ * `recordedAt` lets a check-in be back-dated - people weigh in on Monday and
+ * get around to typing it on Wednesday. Omitted, the column default (now)
+ * stands, which is what the same-day case wants.
+ */
 export async function addMeasurement(
   userId: string,
-  values: Partial<Omit<BodyMeasurement, 'id' | 'recordedAt'>>
+  values: Partial<Omit<BodyMeasurement, 'id' | 'recordedAt'>>,
+  recordedAt?: Date
 ): Promise<BodyMeasurement> {
   const { data, error } = await supabase
     .from('body_measurements')
     .insert({
       user_id: userId,
+      ...(recordedAt ? { recorded_at: recordedAt.toISOString() } : {}),
       weight_kg: values.weightKg ?? null,
       waist_cm: values.waistCm ?? null,
       chest_cm: values.chestCm ?? null,

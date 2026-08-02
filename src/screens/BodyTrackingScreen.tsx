@@ -17,6 +17,9 @@ import {
   SafeAreaView,
 } from '@gluestack-ui/themed';
 import Icon, { IconName } from '@/components/Icon';
+import { useAppToast } from '@/components/AppToast';
+import AppButton from '@/components/AppButton';
+import DateField from '@/components/DateField';
 import { useProfile } from '@/hooks/useProfile';
 import { useMeasurements } from '@/hooks/useMeasurements';
 import LineChart from '@/components/LineChart';
@@ -83,6 +86,8 @@ export default function BodyTrackingScreen() {
   const [checkInArm, setCheckInArm] = useState('');
   const [checkInSaving, setCheckInSaving] = useState(false);
   const [checkInError, setCheckInError] = useState<string | null>(null);
+  const [checkInDate, setCheckInDate] = useState(() => new Date());
+  const toast = useAppToast();
 
   useEffect(() => {
     setWeight(profile.weightKg != null ? String(profile.weightKg) : '');
@@ -101,9 +106,12 @@ export default function BodyTrackingScreen() {
         heightCm: height ? parseFloat(height) : null,
       });
       setSaved(true);
+      toast({ title: t('toast.profileSaved') });
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('body.errSave'));
+      const message = err instanceof Error ? err.message : t('body.errSave');
+      setError(message);
+      toast({ title: t('toast.error'), description: message, variant: 'error' });
     } finally {
       setSaving(false);
     }
@@ -115,18 +123,28 @@ export default function BodyTrackingScreen() {
     setCheckInSaving(true);
     setCheckInError(null);
     try {
-      await addMeasurement({
-        weightKg: checkInWeight ? parseFloat(checkInWeight) : undefined,
-        waistCm: checkInWaist ? parseFloat(checkInWaist) : undefined,
-        chestCm: checkInChest ? parseFloat(checkInChest) : undefined,
-        armCm: checkInArm ? parseFloat(checkInArm) : undefined,
-      });
+      await addMeasurement(
+        {
+          weightKg: checkInWeight ? parseFloat(checkInWeight) : undefined,
+          waistCm: checkInWaist ? parseFloat(checkInWaist) : undefined,
+          chestCm: checkInChest ? parseFloat(checkInChest) : undefined,
+          armCm: checkInArm ? parseFloat(checkInArm) : undefined,
+        },
+        checkInDate
+      );
       setCheckInWeight('');
       setCheckInWaist('');
       setCheckInChest('');
       setCheckInArm('');
+      setCheckInDate(new Date());
+      toast({
+        title: t('toast.measurementSaved'),
+        description: checkInDate.toLocaleDateString(dateLocale, { day: 'numeric', month: 'long' }),
+      });
     } catch (err) {
-      setCheckInError(err instanceof Error ? err.message : t('body.errSaveMeasurement'));
+      const message = err instanceof Error ? err.message : t('body.errSaveMeasurement');
+      setCheckInError(message);
+      toast({ title: t('toast.error'), description: message, variant: 'error' });
     } finally {
       setCheckInSaving(false);
     }
@@ -233,6 +251,14 @@ export default function BodyTrackingScreen() {
                   )}
 
                   <VStack space="sm">
+                    {/* Segmented, so a check-in typed days later still lands
+                        on the day it was actually taken. */}
+                    <DateField
+                      label={t('body.checkInDate')}
+                      value={checkInDate}
+                      onChange={setCheckInDate}
+                      maxToday
+                    />
                     <HStack space="sm">
                       <MeasurementField
                         icon="scale-outline"
@@ -273,12 +299,13 @@ export default function BodyTrackingScreen() {
                     </Text>
                   )}
 
-                  <Button borderRadius="$lg" bg="$primary500" onPress={handleAddMeasurement} isDisabled={checkInSaving}>
-                    <HStack alignItems="center" space="xs">
-                      <Icon name="add" size={17} color="#0E0E0E" />
-                      <ButtonText>{checkInSaving ? '...' : t('body.addMeasurement')}</ButtonText>
-                    </HStack>
-                  </Button>
+                  <AppButton
+                    label={t('body.addMeasurement')}
+                    icon="add"
+                    onPress={handleAddMeasurement}
+                    isLoading={checkInSaving}
+                    full
+                  />
 
                   {measurements.length > 0 && (
                     <VStack space="xs" mt="$1">

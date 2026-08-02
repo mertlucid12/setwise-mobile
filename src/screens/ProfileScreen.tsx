@@ -16,6 +16,8 @@ import {
   SafeAreaView,
 } from '@gluestack-ui/themed';
 import Icon from '@/components/Icon';
+import { useAppToast } from '@/components/AppToast';
+import CheckboxGroup from '@/components/CheckboxGroup';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import AnimatedBackground from '@/components/AnimatedBackground';
@@ -23,44 +25,12 @@ import { useI18n } from '@/i18n';
 import { colors, cardShadow } from '@/theme';
 import { ExperienceLevel, Gender, MainGoal } from '@/types';
 
-function ChipGroup<T extends string>({
-  value,
-  options,
-  onChange,
-}: {
-  value: T | null;
-  options: { key: T; label: string }[];
-  onChange: (v: T) => void;
-}) {
-  return (
-    <HStack flexWrap="wrap">
-      {options.map((opt) => (
-        <Pressable
-          key={opt.key}
-          onPress={() => onChange(opt.key)}
-          bg={value === opt.key ? '$primary500' : '$backgroundDark800'}
-          borderColor={value === opt.key ? '$primary500' : '$borderDark700'}
-          borderWidth={1}
-          borderRadius="$full"
-          px="$3"
-          py="$2"
-          mr="$2"
-          mb="$2"
-        >
-          <Text color={value === opt.key ? '$textDark0' : '$textDark400'} size="xs" fontWeight={value === opt.key ? '$bold' : '$medium'}>
-            {opt.label}
-          </Text>
-        </Pressable>
-      ))}
-    </HStack>
-  );
-}
-
 export default function ProfileScreen() {
   const navigation = useNavigation();
   const { t, lang, setLang } = useI18n();
   const { session, signOut } = useAuth();
   const { profile, loading, saveProfile } = useProfile();
+  const toast = useAppToast();
 
   const [displayName, setDisplayName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -75,26 +45,40 @@ export default function ProfileScreen() {
 
   async function handleSave() {
     Keyboard.dismiss();
+    const next = displayName.trim() || null;
+    if (next === (profile.displayName ?? null)) return;
+
     setSaving(true);
     setError(null);
     setSaved(false);
     try {
       await saveProfile({ ...profile, displayName: displayName.trim() || null });
       setSaved(true);
+      toast({ title: t('toast.profileSaved') });
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('profile.errSave'));
+      const message = err instanceof Error ? err.message : t('profile.errSave');
+      setError(message);
+      toast({ title: t('toast.error'), description: message, variant: 'error' });
     } finally {
       setSaving(false);
     }
   }
 
   async function updateTrainingProfile(patch: Partial<{ gender: Gender; mainGoal: MainGoal; experienceLevel: ExperienceLevel }>) {
+    // Re-picking the answer you already had isn't a change, so it neither
+    // hits the network nor announces anything.
+    const unchanged = (Object.keys(patch) as (keyof typeof patch)[]).every((key) => profile[key] === patch[key]);
+    if (unchanged) return;
+
     setError(null);
     try {
       await saveProfile({ ...profile, ...patch });
+      toast({ title: t('toast.profileSaved') });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('profile.errSave'));
+      const message = err instanceof Error ? err.message : t('profile.errSave');
+      setError(message);
+      toast({ title: t('toast.error'), description: message, variant: 'error' });
     }
   }
 
@@ -104,9 +88,17 @@ export default function ProfileScreen() {
     setError(null);
     try {
       await saveProfile({ ...profile, goalWeightKg: next });
+      toast({ title: t('toast.profileSaved') });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('profile.errSave'));
+      const message = err instanceof Error ? err.message : t('profile.errSave');
+      setError(message);
+      toast({ title: t('toast.error'), description: message, variant: 'error' });
     }
+  }
+
+  async function handleSignOut() {
+    await signOut();
+    toast({ title: t('toast.signedOut'), variant: 'info' });
   }
 
   if (loading) {
@@ -197,51 +189,42 @@ export default function ProfileScreen() {
                 {t('profile.trainingProfile')}
               </Text>
               <VStack space="md">
-                <VStack space="xs">
-                  <Text color="$textDark400" size="xs">
-                    {t('profile.gender')}
-                  </Text>
-                  <ChipGroup
-                    value={profile.gender}
-                    onChange={(v) => updateTrainingProfile({ gender: v })}
-                    options={[
-                      { key: 'male', label: t('onboarding.male') },
-                      { key: 'female', label: t('onboarding.female') },
-                      { key: 'unspecified', label: t('onboarding.unspecified') },
-                    ]}
-                  />
-                </VStack>
+                {/* These are questions, not tags, and each answer carries a
+                    line of explanation - so they read as a checkbox list
+                    rather than a chip row. */}
+                <CheckboxGroup<Gender>
+                  label={t('profile.gender')}
+                  value={profile.gender}
+                  onChange={(v) => updateTrainingProfile({ gender: v })}
+                  options={[
+                    { key: 'male', label: t('onboarding.male') },
+                    { key: 'female', label: t('onboarding.female') },
+                    { key: 'unspecified', label: t('onboarding.unspecified') },
+                  ]}
+                />
 
-                <VStack space="xs">
-                  <Text color="$textDark400" size="xs">
-                    {t('profile.mainGoal')}
-                  </Text>
-                  <ChipGroup
-                    value={profile.mainGoal}
-                    onChange={(v) => updateTrainingProfile({ mainGoal: v })}
-                    options={[
-                      { key: 'build_muscle', label: t('onboarding.goalBuildMuscle') },
-                      { key: 'lose_fat', label: t('onboarding.goalLoseFat') },
-                      { key: 'get_stronger', label: t('onboarding.goalGetStronger') },
-                      { key: 'general_fitness', label: t('onboarding.goalGeneralFitness') },
-                    ]}
-                  />
-                </VStack>
+                <CheckboxGroup<MainGoal>
+                  label={t('profile.mainGoal')}
+                  value={profile.mainGoal}
+                  onChange={(v) => updateTrainingProfile({ mainGoal: v })}
+                  options={[
+                    { key: 'build_muscle', label: t('onboarding.goalBuildMuscle'), description: t('onboarding.goalBuildMuscleDesc') },
+                    { key: 'lose_fat', label: t('onboarding.goalLoseFat'), description: t('onboarding.goalLoseFatDesc') },
+                    { key: 'get_stronger', label: t('onboarding.goalGetStronger'), description: t('onboarding.goalGetStrongerDesc') },
+                    { key: 'general_fitness', label: t('onboarding.goalGeneralFitness'), description: t('onboarding.goalGeneralFitnessDesc') },
+                  ]}
+                />
 
-                <VStack space="xs">
-                  <Text color="$textDark400" size="xs">
-                    {t('profile.experienceLevel')}
-                  </Text>
-                  <ChipGroup
-                    value={profile.experienceLevel}
-                    onChange={(v) => updateTrainingProfile({ experienceLevel: v })}
-                    options={[
-                      { key: 'beginner', label: t('onboarding.beginner') },
-                      { key: 'intermediate', label: t('onboarding.intermediate') },
-                      { key: 'advanced', label: t('onboarding.advanced') },
-                    ]}
-                  />
-                </VStack>
+                <CheckboxGroup<ExperienceLevel>
+                  label={t('profile.experienceLevel')}
+                  value={profile.experienceLevel}
+                  onChange={(v) => updateTrainingProfile({ experienceLevel: v })}
+                  options={[
+                    { key: 'beginner', label: t('onboarding.beginner'), description: t('onboarding.beginnerDesc') },
+                    { key: 'intermediate', label: t('onboarding.intermediate'), description: t('onboarding.intermediateDesc') },
+                    { key: 'advanced', label: t('onboarding.advanced'), description: t('onboarding.advancedDesc') },
+                  ]}
+                />
 
                 <VStack space="xs">
                   <Text color="$textDark400" size="xs">
@@ -299,7 +282,7 @@ export default function ProfileScreen() {
             </Pressable>
 
             <Pressable
-              onPress={signOut}
+              onPress={handleSignOut}
               bg="$backgroundDark900"
               borderWidth={1}
               borderColor="$borderDark800"

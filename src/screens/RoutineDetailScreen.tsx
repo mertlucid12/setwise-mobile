@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Box, VStack, HStack, Heading, Text, Button, ButtonText, Pressable, Spinner } from '@gluestack-ui/themed';
 import Icon, { IconName } from '@/components/Icon';
 import HeroSlashes from '@/components/HeroSlashes';
+import { useAppToast } from '@/components/AppToast';
 import AddRoutineExerciseModal from '@/components/AddRoutineExerciseModal';
 import { useRoutines } from '@/hooks/useRoutines';
 import { useRoutineSchedules } from '@/hooks/useRoutineSchedules';
@@ -90,6 +91,7 @@ export default function RoutineDetailScreen() {
   const { exercises } = useExercises();
   const { weekdaysForRoutine, toggleWeekday } = useRoutineSchedules();
   const { startRoutine } = useActiveRoutine();
+  const toast = useAppToast();
   const [addVisible, setAddVisible] = useState(false);
 
   const routine = routines.find((r) => r.id === routineId) ?? null;
@@ -120,8 +122,21 @@ export default function RoutineDetailScreen() {
 
   async function handleDelete() {
     if (!routine) return;
+    const title = routine.title;
     await deleteRoutine(routine.id);
+    toast({ title: t('toast.routineDeleted'), description: title, variant: 'error' });
     navigation.goBack();
+  }
+
+  async function handleToggleWeekday(weekday: Weekday) {
+    if (!routine) return;
+    const wasActive = scheduledDays.includes(weekday);
+    await toggleWeekday(routine.id, weekday);
+    toast({
+      title: wasActive ? t('toast.scheduleOff') : t('toast.scheduleOn'),
+      description: t('toast.everyDay', { day: weekdayLabels[weekday] }),
+      variant: wasActive ? 'info' : 'success',
+    });
   }
 
   function handleStart() {
@@ -240,7 +255,7 @@ export default function RoutineDetailScreen() {
               return (
                 <Pressable
                   key={weekday}
-                  onPress={() => toggleWeekday(routine.id, weekday)}
+                  onPress={() => handleToggleWeekday(weekday)}
                   flex={1}
                   h={42}
                   borderRadius="$xl"
@@ -331,7 +346,14 @@ export default function RoutineDetailScreen() {
                     {ex.targetSets}×{ex.targetReps}
                   </Text>
 
-                  <Pressable onPress={() => removeExerciseFromRoutine(routine.id, ex.id)} hitSlop={8} ml="$1">
+                  <Pressable
+                    onPress={async () => {
+                      await removeExerciseFromRoutine(routine.id, ex.id);
+                      toast({ title: t('toast.exerciseRemoved'), description: ex.name, variant: 'info' });
+                    }}
+                    hitSlop={8}
+                    ml="$1"
+                  >
                     <Icon name="close" size={16} color={colors.textMuted} />
                   </Pressable>
                 </HStack>
@@ -394,9 +416,10 @@ export default function RoutineDetailScreen() {
         visible={addVisible}
         onClose={() => setAddVisible(false)}
         exercises={exercises}
-        onAdd={(exerciseId, name, targetSets, targetReps) =>
-          addExerciseToRoutine(routine.id, exerciseId, name, targetSets, targetReps)
-        }
+        onAdd={async (exerciseId, name, targetSets, targetReps) => {
+          await addExerciseToRoutine(routine.id, exerciseId, name, targetSets, targetReps);
+          toast({ title: t('toast.exerciseAdded'), description: `${name} · ${targetSets}×${targetReps}` });
+        }}
       />
     </Box>
   );

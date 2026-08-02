@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Linking } from 'react-native';
+import { AppState, Linking } from 'react-native';
 import { Session } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { supabase } from '@/services/supabase';
 import { clearExercisesCache } from '@/hooks/useExercises';
 import { saveProfile } from '@/services/profile';
+import { clearSessionActivity, hasSessionIdledOut, markSessionActive } from '@/services/sessionExpiry';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -13,6 +14,10 @@ interface AuthContextValue {
   session: Session | null;
   initializing: boolean;
   passwordRecovery: boolean;
+  /** Set when a stored session was dropped for being idle too long, so the
+   *  auth screen can say why the user is looking at a login form again. */
+  sessionExpired: boolean;
+  acknowledgeSessionExpired: () => void;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (
     email: string,
@@ -47,16 +52,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [initializing, setInitializing] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    /**
+     * Restore the stored session, but only if it hasn't gone stale. Without
+     * this the app silently signs the last account back in no matter how long
+     * ago that was - what the user should get after a long break is the email
+     * and password form.
+     */
+    async function restore() {
+      const { data } = await supabase.auth.getSession();
+      if (data.session && (await hasSessionIdledOut())) {
+        await supabase.auth.signOut();
+        await clearSessionActivity();
+        clearExercisesCache();
+        setSession(null);
+        setSessionExpired(true);
+      } else {
+        setSession(data.session);
+        if (data.session) await markSessionActive();
+      }
       setInitializing(false);
-    });
+    }
+    restore();
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
+      // A fresh sign-in (or a token refresh, which only happens while the app
+      // is in use) restarts the idle clock.
+      if (newSession) markSessionActive();
+    });
+
+    // Foregrounding is the other moment the clock matters: an app left running
+    // in the background for weeks would otherwise never re-check on launch.
+    const appStateSub = AppState.addEventListener('change', async (state) => {
+      if (state !== 'active') return;
+      const { data } = await supabase.auth.getSession();
+      if (data.session && (await hasSessionIdledOut())) {
+        await supabase.auth.signOut();
+        await clearSessionActivity();
+        clearExercisesCache();
+        setSessionExpired(true);
+      } else if (data.session) {
+        await markSessionActive();
+      }
     });
 
     Linking.getInitialURL().then(handleIncomingUrl);
@@ -64,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       listener.subscription.unsubscribe();
+      appStateSub.remove();
       urlSub.remove();
     };
   }, []);
@@ -72,8 +114,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     initializing,
     passwordRecovery,
+    sessionExpired,
+    acknowledgeSessionExpired: () => setSessionExpired(false),
     signIn: async (email, password) => {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (!error) setSessionExpired(false);
       return { error: error?.message ?? null };
     },
     signUp: async (email, password, fullName) => {
@@ -135,6 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     signOut: async () => {
       await supabase.auth.signOut();
+      await clearSessionActivity();
       clearExercisesCache();
       setPasswordRecovery(false);
     },

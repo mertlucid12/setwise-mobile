@@ -31,10 +31,15 @@ export function useMeasurements() {
     reload();
   }, [reload]);
 
-  async function addMeasurement(values: Partial<Omit<BodyMeasurement, 'id' | 'recordedAt'>>) {
+  async function addMeasurement(
+    values: Partial<Omit<BodyMeasurement, 'id' | 'recordedAt'>>,
+    recordedAt?: Date
+  ) {
     if (!userId) throw new Error('Oturum açık değil.');
-    const entry = await addMeasurementToSupabase(userId, values);
-    setMeasurements((prev) => [entry, ...prev]);
+    const entry = await addMeasurementToSupabase(userId, values, recordedAt);
+    // Back-dated entries have to slot into the history by date, not just at
+    // the top, or the chart would plot them out of order.
+    setMeasurements((prev) => [entry, ...prev].sort((a, b) => b.recordedAt - a.recordedAt));
   }
 
   return { measurements, loading, error, addMeasurement };

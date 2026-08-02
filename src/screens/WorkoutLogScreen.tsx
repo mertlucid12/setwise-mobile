@@ -13,6 +13,7 @@ import {
   SafeAreaView,
 } from '@gluestack-ui/themed';
 import Icon from '@/components/Icon';
+import { useAppToast } from '@/components/AppToast';
 import { useExercises } from '@/hooks/useExercises';
 import { useWorkoutSets } from '@/hooks/useWorkoutSets';
 import { useProfile } from '@/hooks/useProfile';
@@ -42,6 +43,7 @@ export default function WorkoutLogScreen() {
   const { sets, loading: setsLoading, logSet } = useWorkoutSets();
   const { profile } = useProfile();
   const { activeRoutine, clearRoutine } = useActiveRoutine();
+  const toast = useAppToast();
 
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
   const [weight, setWeight] = useState('');
@@ -96,12 +98,18 @@ export default function WorkoutLogScreen() {
       setRpe('');
       setLogSetVisible(false);
       setRestSeconds(REST_SECONDS_DEFAULT);
+      toast({
+        title: t('toast.setLogged'),
+        description: `${activeExercise.name} · ${weight}kg × ${reps}`,
+      });
       if (pr) {
         setPrBanner(t(pr.messageKey, pr.messageParams));
         setTimeout(() => setPrBanner(null), 4000);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('workout.errSaveSet'));
+      const message = err instanceof Error ? err.message : t('workout.errSaveSet');
+      setError(message);
+      toast({ title: t('toast.error'), description: message, variant: 'error' });
     } finally {
       setSaving(false);
     }
@@ -277,6 +285,7 @@ export default function WorkoutLogScreen() {
         onCreated={(exercise) => {
           addExercise(exercise);
           setSelectedExerciseId(exercise.id);
+          toast({ title: t('toast.exerciseAdded'), description: exercise.name });
         }}
       />
 

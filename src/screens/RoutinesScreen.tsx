@@ -17,6 +17,7 @@ import {
   SafeAreaView,
 } from '@gluestack-ui/themed';
 import Icon from '@/components/Icon';
+import { useAppToast } from '@/components/AppToast';
 import { useRoutines } from '@/hooks/useRoutines';
 import { useExercises } from '@/hooks/useExercises';
 import { useI18n } from '@/i18n';
@@ -31,6 +32,7 @@ export default function RoutinesScreen() {
   const { routines, loading, reload, createRoutine } = useRoutines();
   const { exercises } = useExercises();
   const navigation = useNavigation<NativeStackNavigationProp<RoutinesStackParamList>>();
+  const toast = useAppToast();
 
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -51,9 +53,12 @@ export default function RoutinesScreen() {
       const routine = await createRoutine(newTitle.trim());
       setNewTitle('');
       setCreating(false);
+      toast({ title: t('toast.routineCreated'), description: routine.title });
       navigation.navigate('RoutineDetail', { routineId: routine.id });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('routines.errCreate'));
+      const message = err instanceof Error ? err.message : t('routines.errCreate');
+      setError(message);
+      toast({ title: t('toast.error'), description: message, variant: 'error' });
     }
   }
 
