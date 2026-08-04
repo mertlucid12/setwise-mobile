@@ -5,11 +5,26 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Box, VStack, HStack, Heading, Text, Input, InputField, Pressable, Spinner } from '@gluestack-ui/themed';
 import Icon from '@/components/Icon';
 import CheckboxGroup from '@/components/CheckboxGroup';
+import DateField from '@/components/DateField';
+import NutritionTargetsCard from '@/components/NutritionTargetsCard';
 import { useAppToast } from '@/components/AppToast';
 import { useProfile } from '@/hooks/useProfile';
+import { computeNutritionTargets, missingNutritionInputs } from '@/services/nutrition';
 import { useI18n } from '@/i18n';
 import { colors, cardShadow } from '@/theme';
-import { ExperienceLevel, Gender, MainGoal } from '@/types';
+import { ActivityLevel, ExperienceLevel, Gender, MainGoal } from '@/types';
+
+/** 'YYYY-MM-DD' in local time - the same shape the profile column stores. */
+function toDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Where the birth-date field starts when it has never been set. Someone in
+ * their mid-twenties is the commonest case, so it lands a couple of taps away
+ * for most people rather than at an epoch nobody was born in.
+ */
+const BIRTH_DATE_DEFAULT = new Date(2000, 0, 1);
 
 /**
  * Gender, goal, experience level and goal weight - the answers collected once
@@ -59,7 +74,15 @@ export default function TrainingProfileScreen() {
     }
   }
 
-  async function update(patch: Partial<{ gender: Gender; mainGoal: MainGoal; experienceLevel: ExperienceLevel }>) {
+  async function update(
+    patch: Partial<{
+      gender: Gender;
+      mainGoal: MainGoal;
+      experienceLevel: ExperienceLevel;
+      activityLevel: ActivityLevel;
+      birthDate: string;
+    }>
+  ) {
     const unchanged = (Object.keys(patch) as (keyof typeof patch)[]).every((key) => profile[key] === patch[key]);
     if (unchanged) return;
 
@@ -170,6 +193,54 @@ export default function TrainingProfileScreen() {
             ]}
           />
 
+          {/* Birth date only appears as a field once it exists - defaulting a
+              date silently would save a birthday the user never gave, and a
+              calorie target built on it would look authoritative and be wrong. */}
+          {profile.birthDate ? (
+            <DateField
+              label={t('profile.birthDate')}
+              value={new Date(`${profile.birthDate}T00:00:00`)}
+              onChange={(next) => update({ birthDate: toDateKey(next) })}
+              maxToday
+            />
+          ) : (
+            <VStack space="xs">
+              <Text color={colors.textMuted} fontSize={11} fontWeight="$bold" letterSpacing={1} textTransform="uppercase">
+                {t('profile.birthDate')}
+              </Text>
+              <Pressable
+                onPress={() => update({ birthDate: toDateKey(BIRTH_DATE_DEFAULT) })}
+                bg={colors.surfaceAlt}
+                borderWidth={1}
+                borderColor={colors.border}
+                borderStyle="dashed"
+                borderRadius="$xl"
+                px="$3"
+                py="$3"
+                flexDirection="row"
+                alignItems="center"
+              >
+                <Icon name="calendar-outline" size={16} color={colors.accent} />
+                <Text color={colors.textSecondary} size="sm" ml="$2">
+                  {t('profile.birthDateAdd')}
+                </Text>
+              </Pressable>
+            </VStack>
+          )}
+
+          <CheckboxGroup<ActivityLevel>
+            label={t('profile.activityLevel')}
+            value={profile.activityLevel}
+            onChange={(v) => update({ activityLevel: v })}
+            options={[
+              { key: 'sedentary', label: t('profile.activitySedentary'), description: t('profile.activitySedentaryDesc') },
+              { key: 'light', label: t('profile.activityLight'), description: t('profile.activityLightDesc') },
+              { key: 'moderate', label: t('profile.activityModerate'), description: t('profile.activityModerateDesc') },
+              { key: 'active', label: t('profile.activityActive'), description: t('profile.activityActiveDesc') },
+              { key: 'very_active', label: t('profile.activityVeryActive'), description: t('profile.activityVeryActiveDesc') },
+            ]}
+          />
+
           <VStack space="xs">
             <Text color={colors.textMuted} fontSize={11} fontWeight="$bold" letterSpacing={1} textTransform="uppercase">
               {t('profile.goalWeight')}
@@ -187,6 +258,13 @@ export default function TrainingProfileScreen() {
               />
             </Input>
           </VStack>
+
+          {/* The payoff for the answers above, right where they're given, so a
+              changed goal or activity level visibly moves the number. */}
+          <NutritionTargetsCard
+            targets={computeNutritionTargets(profile)}
+            missing={missingNutritionInputs(profile)}
+          />
 
           {error && (
             <Box bg={colors.surface} borderWidth={1} borderLeftWidth={3} borderColor={colors.border} borderLeftColor={colors.danger} borderRadius="$xl" px="$3" py="$2" {...cardShadow}>

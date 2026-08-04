@@ -5,7 +5,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { supabase } from '@/services/supabase';
 import { clearExercisesCache } from '@/hooks/useExercises';
-import { saveProfile } from '@/services/profile';
+import { saveProfile, EMPTY_PROFILE } from '@/services/profile';
 import { clearSessionActivity, hasSessionIdledOut, markSessionActive } from '@/services/sessionExpiry';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -128,16 +128,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         options: { data: { full_name: fullName } },
       });
       if (!error && data.session && data.user) {
-        await saveProfile(data.user.id, {
-          displayName: fullName,
-          weightKg: null,
-          heightCm: null,
-          gender: null,
-          mainGoal: null,
-          experienceLevel: null,
-          goalWeightKg: null,
-          onboardingCompleted: false,
-        }).catch(() => {});
+        // Spread the empty profile rather than listing every field: this seeds
+        // a brand-new row, so it should pick up any column added later without
+        // needing to be edited again.
+        await saveProfile(data.user.id, { ...EMPTY_PROFILE, displayName: fullName }).catch(() => {});
       }
       // Supabase projects with "Confirm email" enabled return no error and no
       // session on signUp - the account exists but can't sign in until the

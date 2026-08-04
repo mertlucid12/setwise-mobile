@@ -78,8 +78,14 @@ export interface Profile {
   mainGoal: MainGoal | null;
   experienceLevel: ExperienceLevel | null;
   goalWeightKg: number | null;
+  /** 'YYYY-MM-DD'. Stored rather than an age so it stays right next year. */
+  birthDate: string | null;
+  activityLevel: ActivityLevel | null;
   onboardingCompleted: boolean;
 }
+
+/** Everything burned outside training - a desk job vs. being on your feet. */
+export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
 
 export interface RoutineExercise {
   id: string;
