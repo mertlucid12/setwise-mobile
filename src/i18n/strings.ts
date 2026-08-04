@@ -164,6 +164,23 @@ export const en: Dict = {
   'calendar.viewMonth': 'Month',
   'calendar.today': 'Today',
   'calendar.rest': 'Rest day — nothing planned, nothing logged.',
+  'calendar.editHint': 'Tap a session to move, swap or remove it.',
+  'calendar.movedHere': 'Moved here',
+
+  // editing one planned session - the wording has to keep "this week" and
+  // "every week" apart, because the two do very different things
+  'plan.moveThisWeek': 'Move this one',
+  'plan.moveThisWeekBody': 'This week only — the plan stays as it is.',
+  'plan.movePrompt': 'Which day this week?',
+  'plan.swapDays': 'Swap two days',
+  'plan.swapDaysBody': 'Trade {day} with another day, every week.',
+  'plan.swapPrompt': 'Swap {day} with:',
+  'plan.skipThisDay': 'Skip this day',
+  'plan.skipThisDayBody': 'Just this date — next week is unaffected.',
+  'plan.removeEveryWeek': 'Remove from every {day}',
+  'plan.removeEveryWeekBody': 'Drops it from the weekly plan for good.',
+  'plan.removeFromDay': 'Remove from this day',
+  'plan.removeFromDayBody': 'Undoes the move you made onto this date.',
 
   // toasts
   'toast.profileSaved': 'Profile updated',
@@ -517,6 +534,21 @@ export const tr: Dict = {
   'calendar.viewMonth': 'Ay',
   'calendar.today': 'Bugün',
   'calendar.rest': 'Dinlenme günü — ne plan var ne kayıt.',
+  'calendar.editHint': 'Taşımak, takas etmek veya kaldırmak için antrenmana dokun.',
+  'calendar.movedHere': 'Buraya taşındı',
+
+  'plan.moveThisWeek': 'Bunu taşı',
+  'plan.moveThisWeekBody': 'Sadece bu hafta — plan olduğu gibi kalır.',
+  'plan.movePrompt': 'Bu hafta hangi güne?',
+  'plan.swapDays': 'İki günü takas et',
+  'plan.swapDaysBody': '{day} gününü başka bir günle değiştir, her hafta.',
+  'plan.swapPrompt': '{day} şununla takas edilsin:',
+  'plan.skipThisDay': 'Bu günü atla',
+  'plan.skipThisDayBody': 'Sadece bu tarih — gelecek hafta etkilenmez.',
+  'plan.removeEveryWeek': 'Her {day} için kaldır',
+  'plan.removeEveryWeekBody': 'Haftalık plandan tamamen çıkarır.',
+  'plan.removeFromDay': 'Bu günden kaldır',
+  'plan.removeFromDayBody': 'Bu tarihe yaptığın taşımayı geri alır.',
 
   // toasts
   'toast.profileSaved': 'Profil güncellendi',

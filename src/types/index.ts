@@ -105,6 +105,20 @@ export interface RoutineSchedule {
   weekday: Weekday;
 }
 
+/**
+ * 'skip' hides a routine the weekly plan would otherwise put on that date;
+ * 'add' shows one the plan doesn't. Moving a session between two days is the
+ * pair: skip the old date, add the new one.
+ */
+export type ScheduleOverrideAction = 'skip' | 'add';
+
+export interface ScheduleOverride {
+  id: string;
+  routineId: string;
+  dateKey: string; // 'YYYY-MM-DD', local calendar date
+  action: ScheduleOverrideAction;
+}
+
 export interface WorkoutDay {
   workoutId: string;
   dateKey: string; // 'YYYY-MM-DD', local calendar date

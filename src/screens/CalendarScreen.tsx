@@ -19,14 +19,17 @@ import {
 import Icon, { IconName } from '@/components/Icon';
 import HeroSlashes from '@/components/HeroSlashes';
 import DayAddSheet from '@/components/DayAddSheet';
+import PlannedRoutineSheet, { PlannedSource } from '@/components/PlannedRoutineSheet';
 import { useAppToast } from '@/components/AppToast';
 import { useCalendarRange } from '@/hooks/useCalendarMonth';
 import { useExercises } from '@/hooks/useExercises';
 import { useRoutines } from '@/hooks/useRoutines';
 import { useRoutineSchedules } from '@/hooks/useRoutineSchedules';
+import { useScheduleOverrides } from '@/hooks/useScheduleOverrides';
 import { useWorkoutSets } from '@/hooks/useWorkoutSets';
 import { useActiveRoutine } from '@/contexts/ActiveRoutineContext';
 import { fetchSetsForWorkout } from '@/services/workouts';
+import { resolvePlannedRoutineIds } from '@/services/scheduleOverrides';
 import { Routine, SetEntry, Weekday } from '@/types';
 import { MUSCLE_ICONS, muscleLabelKey } from '@/constants/muscleGroups';
 import { useI18n } from '@/i18n';
@@ -133,6 +136,7 @@ export default function CalendarScreen() {
   const [notesDraft, setNotesDraft] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null);
 
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
@@ -150,7 +154,20 @@ export default function CalendarScreen() {
   const { days, loading, saveNotes, reload: reloadDays } = useCalendarRange(rangeStartMs, rangeEndMs);
   const { exercises } = useExercises();
   const { routines } = useRoutines();
-  const { routineIdsByWeekday, toggleWeekday, reload: reloadSchedules } = useRoutineSchedules();
+  const {
+    routineIdsByWeekday,
+    toggleWeekday,
+    removeFromWeekday,
+    swapWeekdays,
+    reload: reloadSchedules,
+  } = useRoutineSchedules();
+  const {
+    overridesByDate,
+    setOverride,
+    clearOverride,
+    moveOccurrence,
+    reload: reloadOverrides,
+  } = useScheduleOverrides(toDateKey(new Date(rangeStartMs)), toDateKey(new Date(rangeEndMs)));
   const { logSet } = useWorkoutSets();
   const { startRoutine } = useActiveRoutine();
   const toast = useAppToast();
@@ -160,18 +177,36 @@ export default function CalendarScreen() {
   useFocusEffect(
     useCallback(() => {
       reloadSchedules();
-    }, [reloadSchedules])
+      reloadOverrides();
+    }, [reloadSchedules, reloadOverrides])
   );
 
   const dayByKey = useMemo(() => new Map(days.map((d) => [d.dateKey, d])), [days]);
   const routineById = useMemo(() => new Map(routines.map((r) => [r.id, r])), [routines]);
 
+  // The weekly plan alone no longer answers "what's on this day" - a date can
+  // have a session skipped off it or moved onto it, so every consumer of
+  // "planned" (grid cell, day panel, adherence) goes through the resolver.
   const plannedFor = useCallback(
     (date: Date): Routine[] =>
-      (routineIdsByWeekday.get(mondayFirstIndex(date.getDay())) ?? [])
+      resolvePlannedRoutineIds(
+        toDateKey(date),
+        mondayFirstIndex(date.getDay()),
+        routineIdsByWeekday,
+        overridesByDate
+      )
         .map((id) => routineById.get(id))
         .filter((r): r is Routine => r != null),
-    [routineIdsByWeekday, routineById]
+    [routineIdsByWeekday, overridesByDate, routineById]
+  );
+
+  /** Whether a routine sits on a date because of the weekly plan or a move. */
+  const sourceFor = useCallback(
+    (dateKey: string, routineId: string): PlannedSource =>
+      (overridesByDate.get(dateKey) ?? []).some((o) => o.routineId === routineId && o.action === 'add')
+        ? 'added'
+        : 'weekly',
+    [overridesByDate]
   );
 
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
@@ -261,6 +296,86 @@ export default function CalendarScreen() {
   function handleStartRoutine(routine: Routine) {
     startRoutine(routine);
     navigation.navigate('Antrenman' as never);
+  }
+
+  /** The seven days around the selected date, for "move this one to...". */
+  const selectedWeekDays = useMemo(() => {
+    if (!selectedDate) return [];
+    const start = startOfWeek(selectedDate);
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = addDays(start, i);
+      const dateKey = toDateKey(date);
+      return {
+        dateKey,
+        weekday: mondayFirstIndex(date.getDay()),
+        label: date.toLocaleDateString(dateLocale, { weekday: 'short', day: 'numeric' }),
+        isSelf: dateKey === selectedDateKey,
+      };
+    });
+  }, [selectedDate, selectedDateKey, dateLocale]);
+
+  /**
+   * Every edit below reports what scope it touched, because "this week" and
+   * "every week" look identical once the sheet closes - the toast is the only
+   * confirmation the user gets that they changed one day and not all of them.
+   */
+  async function runPlanEdit(action: () => Promise<void>, title: string, description?: string) {
+    try {
+      await action();
+      toast({ title, description });
+    } catch (err) {
+      toast({
+        title: t('toast.error'),
+        description: err instanceof Error ? err.message : undefined,
+        variant: 'error',
+      });
+    }
+  }
+
+  function handleSkipThisDay(routine: Routine) {
+    if (!selectedDateKey) return Promise.resolve();
+    const movedHere = sourceFor(selectedDateKey, routine.id) === 'added';
+    return runPlanEdit(
+      // Undoing a move is dropping the override; skipping a recurring day is
+      // adding one. Same button, opposite writes.
+      () =>
+        movedHere
+          ? clearOverride(routine.id, selectedDateKey)
+          : setOverride(routine.id, selectedDateKey, 'skip').then(() => undefined),
+      movedHere ? t('plan.removeFromDay') : t('plan.skipThisDay'),
+      selectedDateLabel
+    );
+  }
+
+  function handleRemoveFromWeek(routine: Routine) {
+    if (!selectedDate) return Promise.resolve();
+    const weekday = mondayFirstIndex(selectedDate.getDay());
+    const dayLabel = selectedDate.toLocaleDateString(dateLocale, { weekday: 'long' });
+    return runPlanEdit(
+      () => removeFromWeekday(routine.id, weekday),
+      t('toast.scheduleOff'),
+      t('toast.everyDay', { day: dayLabel })
+    );
+  }
+
+  function handleMoveToDate(routine: Routine, toDateKeyValue: string) {
+    if (!selectedDateKey) return Promise.resolve();
+    const target = new Date(`${toDateKeyValue}T00:00:00`);
+    return runPlanEdit(
+      () => moveOccurrence(routine.id, selectedDateKey, toDateKeyValue),
+      t('plan.moveThisWeek'),
+      target.toLocaleDateString(dateLocale, { weekday: 'long', day: 'numeric', month: 'long' })
+    );
+  }
+
+  function handleSwapWeekday(other: Weekday) {
+    if (!selectedDate) return Promise.resolve();
+    const weekday = mondayFirstIndex(selectedDate.getDay());
+    return runPlanEdit(
+      () => swapWeekdays(weekday, other),
+      t('plan.swapDays'),
+      `${weekdayLabels[weekday]} ↔ ${weekdayLabels[other]}`
+    );
   }
 
   /**
@@ -521,19 +636,27 @@ export default function CalendarScreen() {
 
               {selectedPlanned.length > 0 && (
                 <VStack space="xs" mb="$4">
-                  <Text color={colors.accent} fontSize={11} fontWeight="$bold" letterSpacing={1.2} textTransform="uppercase">
-                    {t('calendar.planned')}
-                  </Text>
-                  {selectedPlanned.map((routine) => (
-                    <HStack
+                  <HStack alignItems="center" justifyContent="space-between">
+                    <Text color={colors.accent} fontSize={11} fontWeight="$bold" letterSpacing={1.2} textTransform="uppercase">
+                      {t('calendar.planned')}
+                    </Text>
+                    <Text color={colors.textMuted} fontSize={10}>
+                      {t('calendar.editHint')}
+                    </Text>
+                  </HStack>
+                  {selectedPlanned.map((routine) => {
+                    const movedHere = sourceFor(selectedDateKey, routine.id) === 'added';
+                    return (
+                    <Pressable
                       key={routine.id}
+                      onPress={() => setEditingRoutine(routine)}
+                      flexDirection="row"
                       alignItems="center"
-                      space="sm"
                       bg={colors.surfaceAlt}
                       borderWidth={1}
                       borderLeftWidth={3}
                       borderColor={colors.border}
-                      borderLeftColor={colors.primary}
+                      borderLeftColor={movedHere ? colors.statusWarm : colors.primary}
                       borderRadius="$xl"
                       px="$3"
                       py="$2"
@@ -542,9 +665,21 @@ export default function CalendarScreen() {
                         <Text color="$textDark0" size="sm" fontWeight="$bold" numberOfLines={1}>
                           {routine.title}
                         </Text>
-                        <Text color={colors.textMuted} fontSize={11}>
-                          {t('routines.exerciseCount', { count: routine.exercises.length })}
-                        </Text>
+                        <HStack alignItems="center" space="xs">
+                          <Text color={colors.textMuted} fontSize={11}>
+                            {t('routines.exerciseCount', { count: routine.exercises.length })}
+                          </Text>
+                          {/* A session that was moved onto this day is worth
+                              calling out - otherwise the plan looks wrong. */}
+                          {movedHere && (
+                            <>
+                              <Box w={3} h={3} borderRadius="$full" bg={colors.statusWarm} />
+                              <Text color={colors.statusWarm} fontSize={10} textTransform="uppercase" letterSpacing={0.6}>
+                                {t('calendar.movedHere')}
+                              </Text>
+                            </>
+                          )}
+                        </HStack>
                       </VStack>
                       {!selectedIsFuture && routine.exercises.length > 0 && (
                         <Pressable
@@ -553,14 +688,17 @@ export default function CalendarScreen() {
                           borderRadius="$lg"
                           px="$3"
                           py="$1"
+                          mr="$2"
                         >
                           <Text color="$textDark0" fontSize={11} fontWeight="$black" textTransform="uppercase">
                             {t('routines.start')}
                           </Text>
                         </Pressable>
                       )}
-                    </HStack>
-                  ))}
+                      <Icon name="chevron-forward" size={16} color={colors.textMuted} />
+                    </Pressable>
+                    );
+                  })}
                 </VStack>
               )}
 
@@ -709,6 +847,24 @@ export default function CalendarScreen() {
               setDaySets(await fetchSetsForWorkout(selectedDay.workoutId));
             }
           }}
+        />
+      )}
+
+      {editingRoutine && selectedDateKey && selectedDate && (
+        <PlannedRoutineSheet
+          visible
+          onClose={() => setEditingRoutine(null)}
+          routineTitle={editingRoutine.title}
+          source={sourceFor(selectedDateKey, editingRoutine.id)}
+          dateLabel={selectedDateLabel}
+          weekday={mondayFirstIndex(selectedDate.getDay())}
+          weekdayLabel={selectedDate.toLocaleDateString(dateLocale, { weekday: 'long' })}
+          weekDays={selectedWeekDays}
+          weekdayLabels={weekdayLabels}
+          onSkipThisDay={() => handleSkipThisDay(editingRoutine)}
+          onRemoveFromWeek={() => handleRemoveFromWeek(editingRoutine)}
+          onMoveToDate={(toKey) => handleMoveToDate(editingRoutine, toKey)}
+          onSwapWeekday={(other) => handleSwapWeekday(other)}
         />
       )}
     </Box>

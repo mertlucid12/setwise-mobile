@@ -46,3 +46,15 @@ export async function removeRoutineSchedule(scheduleId: string): Promise<void> {
   const { error } = await supabase.from('routine_schedules').delete().eq('id', scheduleId);
   if (error) throw error;
 }
+
+/** Moves a recurring slot to a different weekday, permanently - every week. */
+export async function updateRoutineScheduleWeekday(
+  scheduleId: string,
+  weekday: Weekday
+): Promise<void> {
+  const { error } = await supabase
+    .from('routine_schedules')
+    .update({ weekday })
+    .eq('id', scheduleId);
+  if (error) throw error;
+}
