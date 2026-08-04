@@ -1,0 +1,39 @@
+# Render Blueprint — Dashboard'da "New +" -> "Blueprint" ile bu repoyu secince
+# otomatik olusturulur.
+#
+# Setwise'in web yuzu bir statik site: Expo'nun web export'u bir index.html ve
+# tek bir JS paketi uretiyor, calisan bir sunucu process'i yok. Veri katmani
+# Supabase'de durdugu icin arkada bir API'ye de gerek yok.
+#
+# Bunun pratik sonucu: Render'in ucretsiz statik site katmani yetiyor ve
+# hareketsizlikte uyuma / cold start sorunu yasanmiyor — o davranis Web
+# Service'lere ozel. (bkz. tello-backend/render.yaml, orada Socket.IO icin
+# surekli calisan bir process gerektigi anlatiliyor; burada gerekmiyor.)
+services:
+  - type: web
+    name: setwise-web
+    runtime: static
+    # npm ci, package-lock.json'a birebir uyar — deploy'un yerelde test
+    # edilenle ayni bagimlilik agacini kurmasi icin "npm install" degil bu.
+    buildCommand: npm ci && npx expo export --platform web
+    staticPublishPath: ./dist
+    envVars:
+      # EXPO_PUBLIC_* degiskenleri BUILD sirasinda pakete gomulur, calisma
+      # aninda okunmaz — yani bunlar Render panelinde tanimli degilse
+      # uygulama Supabase'e hic baglanamadan yayina cikar. Deger repoya
+      # yazilmasin diye sync:false; ikisini de panelden gir.
+      #
+      # Anon key'in pakete gomulmesi normaldir, zaten public olacak sekilde
+      # tasarlanmistir; koruma RLS'te. Service role key ASLA buraya girmez.
+      - key: EXPO_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: EXPO_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+    routes:
+      # Tek sayfalik uygulama: /profil gibi bir adrese dogrudan girildiginde
+      # ya da sayfa yenilendiginde Render diskte o dosyayi arar ve 404 doner.
+      # Her istegi index.html'e yonlendirmek bunu onler; yonlendirmeyi
+      # uygulamanin kendi router'i yapar.
+      - type: rewrite
+        source: /*
+        destination: /index.html
