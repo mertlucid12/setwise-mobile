@@ -521,6 +521,7 @@ export default function WorkoutLogScreen() {
           data={todaysSetsForExercise}
           keyExtractor={(item) => item.id}
           style={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             // Tapping a logged set opens it for correction - a mistyped weight
             // used to be permanent, and it silently skewed volume, PRs and the

@@ -73,6 +73,7 @@ export default function ExerciseHistoryModal({ visible, onClose, exerciseName, s
                   data={[...workingSets].reverse()}
                   keyExtractor={(item) => item.id}
                   style={{ maxHeight: 220 }}
+                  showsVerticalScrollIndicator={false}
                   renderItem={({ item }) => (
                     <HStack
                       justifyContent="space-between"

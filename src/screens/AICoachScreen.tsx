@@ -76,6 +76,7 @@ export default function AICoachScreen() {
             data={messages}
             keyExtractor={(item) => item.id}
             style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
             renderItem={({ item }) => {
               const isUser = item.role === 'user';
               return (

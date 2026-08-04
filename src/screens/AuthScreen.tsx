@@ -300,7 +300,11 @@ export default function AuthScreen() {
     return (
       <Box flex={1} bg="transparent">
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             <AuthHero icon="mail-unread-outline" title={t('auth.confirmTitle')} subtitle={t('auth.confirmKicker')} />
 
             <Box px="$5" mt={-PANEL_OVERLAP} w="100%" maxWidth={COLUMN_MAX_WIDTH} alignSelf="center">

@@ -58,7 +58,7 @@ export default class ErrorBoundary extends React.Component<{ children: React.Rea
           {error.message || String(error)}
         </Text>
 
-        <ScrollView style={{ flex: 1, marginTop: 12 }}>
+        <ScrollView style={{ flex: 1, marginTop: 12 }} showsVerticalScrollIndicator={false}>
           <Text style={{ color: colors.textMuted, fontSize: 11 }}>{info ?? error.stack ?? ''}</Text>
         </ScrollView>
 

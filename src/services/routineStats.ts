@@ -16,6 +16,13 @@ export interface RoutineStats {
   estimatedMinutes: number;
   /** Primary muscles the routine hits, ordered by set count (descending). */
   muscles: MuscleGroup[];
+  /**
+   * The same ordering with the set counts kept. A bare icon says a routine
+   * touches the chest; "Chest 9" says whether that is the point of the session
+   * or an afterthought, which is what you need to tell two routines apart in a
+   * list without opening either.
+   */
+  muscleSets: { muscle: MuscleGroup; sets: number }[];
 }
 
 export function computeRoutineStats(routine: Routine, exercises: Exercise[]): RoutineStats {
@@ -34,12 +41,16 @@ export function computeRoutineStats(routine: Routine, exercises: Exercise[]): Ro
   }
 
   const rawMinutes = (totalSets * SECONDS_PER_SET) / 60;
+  const ranked = [...setsPerMuscle.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([muscle, sets]) => ({ muscle, sets }));
 
   return {
     exerciseCount: routine.exercises.length,
     totalSets,
     totalReps,
     estimatedMinutes: rawMinutes > 0 ? Math.max(5, Math.round(rawMinutes / 5) * 5) : 0,
-    muscles: [...setsPerMuscle.entries()].sort((a, b) => b[1] - a[1]).map(([muscle]) => muscle),
+    muscles: ranked.map((m) => m.muscle),
+    muscleSets: ranked,
   };
 }

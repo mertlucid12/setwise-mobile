@@ -24,7 +24,7 @@ import { useI18n } from '@/i18n';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import { computeRoutineStats } from '@/services/routineStats';
 import { RoutinesStackParamList } from '@/navigation/types';
-import { MUSCLE_ICONS } from '@/constants/muscleGroups';
+import { MUSCLE_ICONS, muscleLabelKey } from '@/constants/muscleGroups';
 import { colors, cardShadow } from '@/theme';
 
 export default function RoutinesScreen() {
@@ -176,21 +176,39 @@ export default function RoutinesScreen() {
                       </>
                     )}
                   </HStack>
-                  {stats.muscles.length > 0 && (
-                    <HStack space="xs" mt="$1">
-                      {stats.muscles.slice(0, 5).map((muscle) => (
-                        <Box
+                  {/* Five anonymous muscle icons told you a routine trained
+                      "something" five times over - you still had to open it to
+                      find out what. Naming the muscles and attaching the set
+                      count says both what the session is and how hard it
+                      leans, which is the point of a list row. */}
+                  {stats.muscleSets.length > 0 && (
+                    <HStack flexWrap="wrap" mt="$1" style={{ gap: 4 }}>
+                      {stats.muscleSets.slice(0, 4).map(({ muscle, sets }) => (
+                        <HStack
                           key={muscle}
-                          w={22}
-                          h={22}
-                          borderRadius="$md"
-                          bg="$backgroundDark800"
                           alignItems="center"
-                          justifyContent="center"
+                          space="xs"
+                          bg="$backgroundDark800"
+                          borderWidth={1}
+                          borderColor={colors.border}
+                          borderRadius="$md"
+                          px="$2"
+                          py={2}
                         >
-                          <Icon name={MUSCLE_ICONS[muscle]} size={12} color={colors.accentSoft} />
-                        </Box>
+                          <Icon name={MUSCLE_ICONS[muscle]} size={11} color={colors.accentSoft} />
+                          <Text color={colors.textSecondary} fontSize={10} fontWeight="$bold" textTransform="uppercase" letterSpacing={0.4}>
+                            {t(muscleLabelKey(muscle))}
+                          </Text>
+                          <Text color={colors.textMuted} fontSize={10} fontFamily="$mono">
+                            {sets}
+                          </Text>
+                        </HStack>
                       ))}
+                      {stats.muscleSets.length > 4 && (
+                        <Text color={colors.textMuted} fontSize={10} fontFamily="$mono" alignSelf="center">
+                          +{stats.muscleSets.length - 4}
+                        </Text>
+                      )}
                     </HStack>
                   )}
                 </VStack>
