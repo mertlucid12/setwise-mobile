@@ -213,6 +213,30 @@ export const colors = {
   textMuted: '#AE8883',
   /** Text that sits on a primary fill. */
   onPrimary: '#FFFEFF',
+
+  /**
+   * Three-stop status ramp, for anything that grades a state from "needs
+   * attention" to "where you want to be": muscle recovery, weekly volume
+   * against target, and future gauges.
+   *
+   * These exist because the obvious picks from the palette above do not work
+   * for grading. `danger`, `accent` and `primaryLight` all resolve to the same
+   * salmon (#FFB4AB / #FFB4AA / #FFB4AA), so a three-state scale built from
+   * them renders as one colour. A ramp has to separate on hue *and* lightness
+   * to survive a 10px legend dot or a muscle the size of a fingernail, so
+   * these step crimson -> ember -> gold with roughly even lightness gaps
+   * (L* ~48 / ~65 / ~82) rather than sitting on one hue.
+   *
+   * Meaning runs hot-to-ready, not hot-to-cold: gold is the earned state the
+   * rest of the theme already reserves for PRs, and crimson is the one that
+   * wants a decision. All three are forge colours, so the warrior direction
+   * holds.
+   */
+  statusHot: '#E6211E',
+  statusWarm: '#FF8A1F',
+  statusReady: '#F5C542',
+  /** Neutral for "no data yet" - present, but clearly out of the ramp. */
+  statusIdle: '#3A3634',
 };
 
 export const gradients = {

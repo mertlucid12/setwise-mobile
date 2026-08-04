@@ -30,10 +30,16 @@ const RECOVERY_LABEL_KEY: Record<RecoveryStatus, string> = {
   fresh: 'volume.statusFresh',
 };
 
+/**
+ * Same ramp as the recovery map, same reason: `primaryLight` and `danger` are
+ * the same salmon, so "on target" and "over target" used to be one colour on
+ * both the badge and the progress bar. Gold is the state you want here too,
+ * with under- and over-target reading as the two directions off it.
+ */
 const STATUS_COLOR: Record<MuscleVolumeSummary['status'], string> = {
-  below: '#D98E5A',
-  in_range: colors.primaryLight,
-  above: colors.danger,
+  below: colors.statusWarm,
+  in_range: colors.statusReady,
+  above: colors.statusHot,
 };
 
 const STATUS_LABEL_KEY: Record<MuscleVolumeSummary['status'], string> = {
@@ -96,11 +102,21 @@ export default function VolumeDashboardScreen() {
 
               <BodyRecoveryMap recovery={recovery} gender={profile.gender} />
 
+              {/* The legend is the only place the four colours sit side by
+                  side, so it has to be readable on its own - a 8px dot in
+                  $textDark500 was too small and too dim to be the key to the
+                  map above it. */}
               <HStack space="md" mt="$3" flexWrap="wrap" justifyContent="center">
                 {(['fresh', 'recovering', 'fatigued', 'untrained'] as const).map((status) => (
                   <HStack key={status} alignItems="center" space="xs" mr="$3" mb="$1">
-                    <Box w={8} h={8} borderRadius="$full" bg={RECOVERY_COLOR[status]} />
-                    <Text color="$textDark500" size="2xs">
+                    <Box
+                      w={12}
+                      h={12}
+                      bg={RECOVERY_COLOR[status]}
+                      borderWidth={1}
+                      borderColor={colors.bg}
+                    />
+                    <Text color={colors.textSecondary} size="xs">
                       {t(RECOVERY_LABEL_KEY[status])}
                     </Text>
                   </HStack>
@@ -124,7 +140,7 @@ export default function VolumeDashboardScreen() {
                         mr="$2"
                         mb="$2"
                       >
-                        <Box w={6} h={6} borderRadius="$full" bg={RECOVERY_COLOR[r.status]} />
+                        <Box w={8} h={8} bg={RECOVERY_COLOR[r.status]} />
                         <Text color="$textDark300" size="2xs" fontWeight="$semibold">
                           {t(muscleLabelKey(r.muscle))}
                         </Text>
